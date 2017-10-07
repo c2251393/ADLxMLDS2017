@@ -1,20 +1,31 @@
 import time, math
 import torch
 from torch.autograd import Variable
+from torch.nn.utils.rnn import pack_padded_sequence, pad_packed_sequence
 
+N_FEAT = 39
+N_LABEL = 40
+USE_CUDA = False
+
+# fn: 48 id ch, fn2: 48 39
 def make_lab2id(fn, fn2):
+    lab2id = {}
+    cur_id = 1
+    f2 = open(fn2)
+    for line in f2.readlines():
+        lab, nlab = line.strip().split('\t')
+        if nlab not in lab2id:
+            lab2id[nlab] = cur_id
+            cur_id += 1
+        lab2id[lab] = lab2id[nlab]
+
     f = open(fn)
-    res = {}
+    id2ascii = {}
     for line in f.readlines():
-        lab, id, _ = line.split('\t')
-        res[lab] = int(id)
-    return res
+        lab, id, ch = line.strip().split('\t')
+        id2ascii[lab] = ch
+    return lab2id, id2ascii
 
-
-def make_id2lab(fn, fn2):
-    f = open(fn)
-    res = {}
-    pass
 
 def to_torch_var(xs, ys):
     # (1 x len(xs))
@@ -26,6 +37,30 @@ def to_torch_var(xs, ys):
 
     return Variable(input), Variable(target)
 
+def pad_feat(seq, max_len):
+    seq += [[0.0 for _ in range(N_FEAT)] for i in range(max_len - len(seq))]
+    return seq
+
+def pad_label(seq, max_len):
+    seq += [0 for i in range(max_len - len(seq))]
+    return seq
+
+def make_batch(xss, yss):
+    # xss: batch_size x len x n_feat
+    # yss: batch_size x len
+    seq_pairs = sorted(zip(xss, yss), key=lambda p:len(p[0]), reverse=True)
+    xss, yss = zip(*seq_pairs)
+
+    lens = [len(xs) for xs in xss]
+    max_len = max(lens)
+    xss_pad = [pad_feat(xs, max_len) for xs in xss]
+    yss_pad = [pad_label(ys, max_len) for ys in yss]
+
+    # (batch_size x maxlen)
+    xss_var = Variable(torch.FloatTensor(xss_pad))
+    yss_var = Variable(torch.LongTensor(yss_pad))
+
+    return xss_var, yss_var, lens
 
 def time_since(since):
     s = time.time() - since

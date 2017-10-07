@@ -4,6 +4,7 @@ from torch.autograd import Variable
 import argparse
 import glob
 from util import *
+from timit import *
 import random
 import model_rnn
 
@@ -11,81 +12,80 @@ parser = argparse.ArgumentParser(description='')
 parser.add_argument('data', default='./data/',
                     help='data folder')
 parser.add_argument('--lr', type=float, default=float(0.1))
-parser.add_argument('--n_epoch', type=int, default=int(10000))
-parser.add_argument('--hidden_size', type=int, default=int(100))
+parser.add_argument('--n_epoch', type=int, default=int(3))
+parser.add_argument('--hidden_size', type=int, default=int(20))
+parser.add_argument('--n_layers', type=int, default=int(1))
+parser.add_argument('--batch_size', type=int, default=int(32))
+
 args = parser.parse_args()
 
-
-def random_batch(batch_size, pairs):
-    input_seqs = []
-    target_seqs = []
-    for i in range(batch_size):
-        (ys, xs) = random.choice(pairs)
-        input_seqs.append(xs)
-        target_seqs.append(ys)
-    max_len = max(map(len, input_seqs))
-    for i in range(batch_size):
-        pass
 
 LR = args.lr
 N_EPOCH = args.n_epoch
 HIDDEN_SIZE = args.hidden_size
-N_FEAT = 39
-N_LABEL = 49
-print_every = 100
-valid_every = 2000
+BATCH_SIZE = args.batch_size
+N_LAYERS = args.n_layers
+
+print_every = 10
 plot_every = 10
 
-print(LR, N_EPOCH, HIDDEN_SIZE)
+print(LR, N_EPOCH, HIDDEN_SIZE, N_LAYERS)
 
-train_f = args.data + "mfcc/train.ark"
-train_lab_f = args.data + "label/train.lab"
-lab2id = make_lab2id(args.data + "48phone_char.map", args.data + "/phones/48_39.map")
+timit = TIMIT(args.data, "tr")
 
-# [(targets, inputs)]
-pairs = read_data(train_f, train_lab_f, lab2id)
-random.shuffle(pairs)
-tr_set, valid_set = pairs[100:], pairs[:100]
-
-def random_train_inst():
-    ys, xs = random.choice(tr_set)
-    return to_torch_var(xs, ys)
-
-
-rnn = model_rnn.RNN(N_FEAT, HIDDEN_SIZE, N_LABEL, 1)
+rnn = model_rnn.RNN(N_FEAT, HIDDEN_SIZE, N_LABEL, BATCH_SIZE, N_LAYERS)
 opt = torch.optim.SGD(rnn.parameters(), lr = LR)
 criterion = nn.CrossEntropyLoss()
 
-def train(inp, target):
-    # print(inp)
-    # print(target)
+def train(inp, target, lens):
+    # inp: (BATCH_SIZE x maxlen x N_FEAT)
+    # target: (BATCH_SIZE x maxlen)
     hidden = rnn.init_hidden()
     rnn.zero_grad()
+    output, hidden = rnn(inp, hidden, lens)
+
     loss = 0
 
-    for c in range(len(inp)):
-        output, hidden = rnn(inp[c], hidden)
-        loss += criterion(output, target[c])
+    for i in range(BATCH_SIZE):
+        for j in range(lens[i]):
+            loss += criterion(output[i][j].view(1, -1), target[i][j])
 
     loss.backward()
     opt.step()
 
-    return loss.data[0] / len(inp)
+    return loss.data[0] / sum(lens)
 
-def evaluate(inp, target):
+
+def eval(inp, target, lens):
+    # inp: (BATCH_SIZE x maxlen x N_FEAT)
+    # target: (BATCH_SIZE x maxlen)
     hidden = rnn.init_hidden()
+    output, hidden = rnn(inp, hidden, lens)
+
+    acc = 0
     loss = 0
-    for c in range(len(inp)):
-        output, hidden = rnn(inp[c], hidden)
-        loss += criterion(output, target[c])
-    return loss.data[0] / len(inp)
+
+    for i in range(BATCH_SIZE):
+        for j in range(lens[i]):
+            loss += criterion(output[i][j].view(1, -1), target[i][j])
+            my_y = output[i][j].topk(1)[1].data[0]
+            real_y = target[i][j].data[0]
+            if my_y == real_y:
+                acc += 1
+
+    return loss.data[0] / sum(lens), acc / sum(lens)
+
 
 def eval_valid():
-    loss = 0
-    for i in range(len(valid_set)):
-        ys, xs = valid_set[i]
-        loss += evaluate(*to_torch_var(xs, ys))
-    return loss / len(valid_set)
+    v_xss = [p[1] for p in valid_set]
+    v_yss = [p[0] for p in valid_set]
+    X, Y, lens = make_batch(v_xss, v_yss)
+
+    loss, acc = eval(X, Y, lens)
+
+    print("  VALID LOSS %f ACC %f%%" % (loss, acc * 100))
+
+    return loss, acc
 
 
 start = time.time()
@@ -93,21 +93,31 @@ loss_avg = 0
 all_losses = []
 loss_tot = 0
 
+iter = 1
 for epoch in range(1, N_EPOCH + 1):
-    input, target = random_train_inst()
-    loss = train(input, target)
-    loss_avg += loss
-    loss_tot += loss
+    random.shuffle(timit.tr_set)
+    for i in range(0, len(timit.tr_set), BATCH_SIZE):
+        if i + BATCH_SIZE > len(timit.tr_set):
+            continue
+        input, target = timit.get_batch(i, BATCH_SIZE)
 
-    if epoch % print_every == 0:
-        print('[%s (%d %d%%) %.4f %.4f]' % (time_since(start), epoch, epoch / N_EPOCH * 100, loss, loss_tot / epoch))
+        input, target, lens = make_batch(input, target)
 
-    if epoch % valid_every == 0:
-        print('  VALID LOSS %f' % (eval_valid()))
+        loss = train(input, target, lens)
 
-    if epoch % plot_every == 0:
-        all_losses.append(loss_avg / plot_every)
-        loss_avg = 0
+        loss_avg += loss
+        loss_tot += loss
+
+        if iter % print_every == 0:
+            print('[%s (%d %d%%) %.4f %.4f]' %
+                  (time_since(start), iter, iter / (N_EPOCH * len(tr_set)) * 100, loss, loss_tot / iter))
+
+        if iter % plot_every == 0:
+            all_losses.append(loss_avg / plot_every)
+            loss_avg = 0
+
+        iter += 1
+    eval_valid()
 
 print(all_losses)
 
