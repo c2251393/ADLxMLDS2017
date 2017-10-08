@@ -3,6 +3,7 @@ import torch.nn as nn
 from torch.autograd import Variable
 import torch.nn.functional as F
 from torch.nn.utils.rnn import pack_padded_sequence, pad_packed_sequence
+from util import *
 
 class RNN(nn.Module):
     def __init__(self,
@@ -47,4 +48,6 @@ class RNN(nn.Module):
     def init_hidden(self):
         h0 = Variable(torch.zeros(self.n_layers, self.batch_size, self.hidden_size))
         c0 = Variable(torch.zeros(self.n_layers, self.batch_size, self.hidden_size))
+        if USE_CUDA:
+            h0, c0 = h0.cuda(), c0.cuda()
         return (h0, c0)
