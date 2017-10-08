@@ -8,6 +8,7 @@ from timit import *
 import random
 import model_rnn
 import model_cnn
+import model_brnn
 
 parser = argparse.ArgumentParser(description='')
 parser.add_argument('data', default='./data/',
@@ -15,7 +16,7 @@ parser.add_argument('data', default='./data/',
 parser.add_argument('feat', default='mfcc',
                     help='mfcc or fbank')
 parser.add_argument('model', default='rnn',
-                    help='model (rnn or cnn)')
+                    help='model (rnn or cnn or brnn)')
 parser.add_argument('--lr', type=float, default=float(0.1))
 parser.add_argument('--n_epoch', type=int, default=int(3))
 parser.add_argument('--hidden_size', type=int, default=int(20))
@@ -48,6 +49,8 @@ if args.model == "rnn":
     model = model_rnn.RNN(timit.N_FEAT, HIDDEN_SIZE, timit.N_LABEL, BATCH_SIZE, N_LAYERS, DROPOUT)
 elif args.model == "cnn":
     model = model_cnn.CNN(timit.N_FEAT, WINDOW_SIZE, HIDDEN_SIZE, timit.N_LABEL, BATCH_SIZE, N_LAYERS, DROPOUT)
+elif args.model == "brnn":
+    model = model_brnn.BRNN(timit.N_FEAT, HIDDEN_SIZE, timit.N_LABEL, BATCH_SIZE, N_LAYERS, DROPOUT)
 
 if USE_CUDA:
     model = model.cuda()
@@ -123,8 +126,8 @@ iter = 1
 eval_valid()
 for epoch in range(1, N_EPOCH + 1):
     random.shuffle(timit.tr_set)
-    # for i in range(0, len(timit.tr_set), BATCH_SIZE):
-    for i in range(0, 100, BATCH_SIZE):
+    for i in range(0, len(timit.tr_set), BATCH_SIZE):
+    # for i in range(0, 100, BATCH_SIZE):
         input, target, useful = timit.get_batch(i, BATCH_SIZE)
 
         input, target, lens = make_batch(input, target, timit.N_FEAT)
