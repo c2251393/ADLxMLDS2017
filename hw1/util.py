@@ -3,10 +3,7 @@ import torch
 from torch.autograd import Variable
 from torch.nn.utils.rnn import pack_padded_sequence, pad_packed_sequence
 
-N_FEAT = 39
-N_LABEL = 40
 USE_CUDA = torch.cuda.is_available()
-
 
 # fn: 48 id ch, fn2: 48 39
 def make_lab2id(fn, fn2):
@@ -28,7 +25,7 @@ def make_lab2id(fn, fn2):
     return lab2id, id2ascii
 
 
-def pad_feat(seq, max_len):
+def pad_feat(seq, max_len, N_FEAT):
     seq += [[0.0 for _ in range(N_FEAT)] for i in range(max_len - len(seq))]
     return seq
 
@@ -38,7 +35,7 @@ def pad_label(seq, max_len):
     return seq
 
 
-def make_batch(xss, yss):
+def make_batch(xss, yss, N_FEAT):
     # xss: batch_size x len x n_feat
     # yss: batch_size x len
     seq_pairs = sorted(zip(xss, yss), key=lambda p:len(p[0]), reverse=True)
@@ -46,7 +43,7 @@ def make_batch(xss, yss):
 
     lens = [len(xs) for xs in xss]
     max_len = max(lens)
-    xss_pad = [pad_feat(xs, max_len) for xs in xss]
+    xss_pad = [pad_feat(xs, max_len, N_FEAT) for xs in xss]
     yss_pad = [pad_label(ys, max_len) for ys in yss]
 
     # (batch_size x maxlen)
@@ -78,6 +75,14 @@ def read_data(f, lab_f, lab2id):
             id = spid + '_' + seid
 
             feat = list(map(float, words[1:]))
+
+            mean = sum(feat) / len(feat)
+            for i in range(len(feat)):
+                feat[i] -= mean
+
+            norm = math.sqrt(sum(x*x for x in feat))
+            for i in range(len(feat)):
+                feat[i] /= norm
 
             if id not in X:
                 X[id] = []

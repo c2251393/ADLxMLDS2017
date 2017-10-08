@@ -12,6 +12,8 @@ import model_cnn
 parser = argparse.ArgumentParser(description='')
 parser.add_argument('data', default='./data/',
                     help='data folder')
+parser.add_argument('feat', default='mfcc',
+                    help='mfcc or fbank')
 parser.add_argument('model', default='rnn',
                     help='model (rnn or cnn)')
 parser.add_argument('--lr', type=float, default=float(0.1))
@@ -35,22 +37,23 @@ BATCH_SIZE = args.batch_size
 N_LAYERS = args.n_layers
 DROPOUT = args.dropout
 
-print_every = 10
+print_every = 1
 plot_every = 10
 
-print(args.model, LR, N_EPOCH, HIDDEN_SIZE, N_LAYERS, BATCH_SIZE, WINDOW_SIZE, DROPOUT)
+print(args.model, args.feat, LR, N_EPOCH, HIDDEN_SIZE, N_LAYERS, BATCH_SIZE, WINDOW_SIZE, DROPOUT)
 
-timit = TIMIT(args.data, "tr")
+timit = TIMIT(args.data, "tr", args.feat)
 
 if args.model == "rnn":
-    model = model_rnn.RNN(N_FEAT, HIDDEN_SIZE, N_LABEL, BATCH_SIZE, N_LAYERS, DROPOUT)
+    model = model_rnn.RNN(timit.N_FEAT, HIDDEN_SIZE, timit.N_LABEL, BATCH_SIZE, N_LAYERS, DROPOUT)
 elif args.model == "cnn":
-    model = model_cnn.CNN(N_FEAT, WINDOW_SIZE, HIDDEN_SIZE, N_LABEL, BATCH_SIZE, N_LAYERS, DROPOUT)
+    model = model_cnn.CNN(timit.N_FEAT, WINDOW_SIZE, HIDDEN_SIZE, timit.N_LABEL, BATCH_SIZE, N_LAYERS, DROPOUT)
 
 if USE_CUDA:
     model = model.cuda()
 
-opt = torch.optim.SGD(model.parameters(), lr = LR)
+opt = torch.optim.Adam(model.parameters(), lr = LR)
+# criterion = nn.CrossEntropyLoss(timit.label_wt())
 criterion = nn.CrossEntropyLoss()
 
 def train(inp, target, useful, lens):
@@ -98,7 +101,7 @@ def eval_valid():
     v_len = len(timit.valid_set)
     for i in range(0, v_len, BATCH_SIZE):
         input, target, useful = timit.get_batch(i, BATCH_SIZE, "va")
-        input, target, lens = make_batch(input, target)
+        input, target, lens = make_batch(input, target, timit.N_FEAT)
         tloss, tacc = batch_eval(input, target, useful, lens)
         loss += tloss * useful
         acc  += tacc * useful
@@ -120,10 +123,11 @@ iter = 1
 eval_valid()
 for epoch in range(1, N_EPOCH + 1):
     random.shuffle(timit.tr_set)
-    for i in range(0, len(timit.tr_set), BATCH_SIZE):
+    # for i in range(0, len(timit.tr_set), BATCH_SIZE):
+    for i in range(0, 100, BATCH_SIZE):
         input, target, useful = timit.get_batch(i, BATCH_SIZE)
 
-        input, target, lens = make_batch(input, target)
+        input, target, lens = make_batch(input, target, timit.N_FEAT)
 
         loss = train(input, target, useful, lens)
 
