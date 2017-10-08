@@ -24,13 +24,36 @@ class TIMIT():
             print("# of training %d" % (len(self.tr_set)))
             print("# of validation %d" % (len(self.valid_set)))
         elif type == "te":
-            # TODO
-            pass
+            test_f = self.data + "mfcc/test.ark"
+            self.te_set = read_data(test_f, None, self.lab2id)
+            print("# of testing %d" % (len(self.te_set)))
 
-    def get_batch(self, i, BATCH_SIZE):
-        # xss: [[[feat * 39] * seq len] * BATCH]
-        # yss: [[label * seqlen] * BATCH]
-        xss = [self.tr_set[i+j][1] for j in range(BATCH_SIZE)]
-        yss = [self.tr_set[i+j][0] for j in range(BATCH_SIZE)]
-        return xss, yss
 
+    def get_batch(self, i, batch_size, type="tr"):
+        if type == "tr":
+            # xss: [[[feat * 39] * seq len] * BATCH]
+            # yss: [[label * seqlen] * BATCH]
+            xss = [p[1] for p in self.tr_set[i: i+batch_size]]
+            xss += [[[0 for _ in range(N_FEAT)]] for _ in range(batch_size - len(xss))]
+            yss = [p[0] for p in self.tr_set[i: i+batch_size]]
+            yss += [[0] for _ in range(batch_size - len(yss))]
+            sz = len(self.tr_set[i: i+batch_size])
+            return xss, yss, sz
+        elif type == "va":
+            # xss: [[[feat * 39] * seq len] * BATCH]
+            # yss: [[label * seqlen] * BATCH]
+            xss = [p[1] for p in self.valid_set[i: i+batch_size]]
+            xss += [[[0 for _ in range(N_FEAT)]] for _ in range(batch_size - len(xss))]
+            yss = [p[0] for p in self.valid_set[i: i+batch_size]]
+            yss += [[0] for _ in range(batch_size - len(yss))]
+            sz = len(self.valid_set[i: i+batch_size])
+            return xss, yss, sz
+        elif type == "te":
+            # xss: [[[feat * 39] * seq len] * BATCH]
+            # yss: ["id" * BATCH]
+            xss = [p[0] for p in self.te_set[i: i+batch_size]]
+            xss += [[[0 for _ in range(N_FEAT)]] for _ in range(batch_size - len(xss))]
+            ids = [p[1] for p in self.te_set[i: i+batch_size]]
+            ids += ["" for _ in range(batch_size - len(ids))]
+            sz = len(self.te_set[i: i+batch_size])
+            return xss, ids, sz

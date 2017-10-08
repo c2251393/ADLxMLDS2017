@@ -87,7 +87,9 @@ def read_data(f, lab_f, lab2id):
             X[id].append(feat)
 
     if lab_f == None:
-        res = list(X.values())
+        res = []
+        for k in X.keys:
+            res.append((X[k], k))
         return res
 
     with open(lab_f, 'r') as f:
@@ -105,7 +107,7 @@ def read_data(f, lab_f, lab2id):
 
     res = []
     for k in X.keys():
-        res.append((y[k], X[k]))
+        res.append((y[k], X[k], k))
 
     return res
 

@@ -7,6 +7,7 @@ from util import *
 from timit import *
 import random
 import model_rnn
+import model_cnn
 
 parser = argparse.ArgumentParser(description='')
 parser.add_argument('data', default='./data/',
@@ -33,16 +34,16 @@ print(LR, N_EPOCH, HIDDEN_SIZE, N_LAYERS)
 
 timit = TIMIT(args.data, "tr")
 
-rnn = model_rnn.RNN(N_FEAT, HIDDEN_SIZE, N_LABEL, BATCH_SIZE, N_LAYERS)
-opt = torch.optim.SGD(rnn.parameters(), lr = LR)
+model = model_cnn.CNN(N_FEAT, (3, 2), HIDDEN_SIZE, N_LABEL, BATCH_SIZE, N_LAYERS)
+opt = torch.optim.SGD(model.parameters(), lr = LR)
 criterion = nn.CrossEntropyLoss()
 
 def train(inp, target, useful, lens):
     # inp: (BATCH_SIZE x maxlen x N_FEAT)
     # target: (BATCH_SIZE x maxlen)
-    hidden = rnn.init_hidden()
-    rnn.zero_grad()
-    output, hidden = rnn(inp, hidden, lens)
+    hidden = model.init_hidden()
+    model.zero_grad()
+    output, hidden = model(inp, hidden, lens)
 
     loss = 0
 
@@ -59,8 +60,8 @@ def train(inp, target, useful, lens):
 def batch_eval(inp, target, useful, lens):
     # inp: (BATCH_SIZE x maxlen x N_FEAT)
     # target: (BATCH_SIZE x maxlen)
-    hidden = rnn.init_hidden()
-    output, hidden = rnn(inp, hidden, lens)
+    hidden = model.init_hidden()
+    output, hidden = model(inp, hidden, lens)
 
     acc = 0
     loss = 0
@@ -127,4 +128,4 @@ for epoch in range(1, N_EPOCH + 1):
 
 print(all_losses)
 
-torch.save(rnn.state_dict(), "rnn.pt")
+torch.save(model.state_dict(), "cnn.pt")
