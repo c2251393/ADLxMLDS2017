@@ -35,6 +35,9 @@ print(LR, N_EPOCH, HIDDEN_SIZE, N_LAYERS)
 timit = TIMIT(args.data, "tr")
 
 model = model_cnn.CNN(N_FEAT, (3, 2), HIDDEN_SIZE, N_LABEL, BATCH_SIZE, N_LAYERS)
+if USE_CUDA:
+    model = model.cuda()
+
 opt = torch.optim.SGD(model.parameters(), lr = LR)
 criterion = nn.CrossEntropyLoss()
 

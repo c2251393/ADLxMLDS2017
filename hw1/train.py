@@ -7,42 +7,58 @@ from util import *
 from timit import *
 import random
 import model_rnn
+import model_cnn
 
 parser = argparse.ArgumentParser(description='')
 parser.add_argument('data', default='./data/',
                     help='data folder')
+parser.add_argument('model', default='rnn',
+                    help='model (rnn or cnn)')
 parser.add_argument('--lr', type=float, default=float(0.1))
 parser.add_argument('--n_epoch', type=int, default=int(3))
 parser.add_argument('--hidden_size', type=int, default=int(20))
 parser.add_argument('--n_layers', type=int, default=int(1))
 parser.add_argument('--batch_size', type=int, default=int(32))
+parser.add_argument('--window_size_x', type=int, default=int(3))
+parser.add_argument('--window_size_y', type=int, default=int(2))
+parser.add_argument('--dropout', type=float, default=int(0.0))
 
 args = parser.parse_args()
+
 
 
 LR = args.lr
 N_EPOCH = args.n_epoch
 HIDDEN_SIZE = args.hidden_size
+WINDOW_SIZE = (args.window_size_x, args.window_size_y)
 BATCH_SIZE = args.batch_size
 N_LAYERS = args.n_layers
+DROPOUT = args.dropout
 
 print_every = 10
 plot_every = 10
 
-print(LR, N_EPOCH, HIDDEN_SIZE, N_LAYERS)
+print(args.model, LR, N_EPOCH, HIDDEN_SIZE, N_LAYERS, BATCH_SIZE, WINDOW_SIZE, DROPOUT)
 
 timit = TIMIT(args.data, "tr")
 
-rnn = model_rnn.RNN(N_FEAT, HIDDEN_SIZE, N_LABEL, BATCH_SIZE, N_LAYERS)
-opt = torch.optim.SGD(rnn.parameters(), lr = LR)
+if args.model == "rnn":
+    model = model_rnn.RNN(N_FEAT, HIDDEN_SIZE, N_LABEL, BATCH_SIZE, N_LAYERS, DROPOUT)
+elif args.model == "cnn":
+    model = model_cnn.CNN(N_FEAT, WINDOW_SIZE, HIDDEN_SIZE, N_LABEL, BATCH_SIZE, N_LAYERS, DROPOUT)
+
+if USE_CUDA:
+    model = model.cuda()
+
+opt = torch.optim.SGD(model.parameters(), lr = LR)
 criterion = nn.CrossEntropyLoss()
 
 def train(inp, target, useful, lens):
     # inp: (BATCH_SIZE x maxlen x N_FEAT)
     # target: (BATCH_SIZE x maxlen)
-    hidden = rnn.init_hidden()
-    rnn.zero_grad()
-    output, hidden = rnn(inp, hidden, lens)
+    hidden = model.init_hidden()
+    model.zero_grad()
+    output, hidden = model(inp, hidden, lens)
 
     loss = 0
 
@@ -59,8 +75,8 @@ def train(inp, target, useful, lens):
 def batch_eval(inp, target, useful, lens):
     # inp: (BATCH_SIZE x maxlen x N_FEAT)
     # target: (BATCH_SIZE x maxlen)
-    hidden = rnn.init_hidden()
-    output, hidden = rnn(inp, hidden, lens)
+    hidden = model.init_hidden()
+    output, hidden = model(inp, hidden, lens)
 
     acc = 0
     loss = 0
@@ -127,4 +143,4 @@ for epoch in range(1, N_EPOCH + 1):
 
 print(all_losses)
 
-torch.save(rnn.state_dict(), "rnn.pt")
+torch.save(model.state_dict(), args.model + ".pt")

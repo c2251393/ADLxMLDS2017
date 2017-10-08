@@ -5,7 +5,8 @@ from torch.nn.utils.rnn import pack_padded_sequence, pad_packed_sequence
 
 N_FEAT = 39
 N_LABEL = 40
-USE_CUDA = False
+USE_CUDA = torch.cuda.is_available()
+
 
 # fn: 48 id ch, fn2: 48 39
 def make_lab2id(fn, fn2):
@@ -27,23 +28,15 @@ def make_lab2id(fn, fn2):
     return lab2id, id2ascii
 
 
-def to_torch_var(xs, ys):
-    # (1 x len(xs))
-    target = torch.zeros(len(xs)).long()
-    for i in range(len(xs)):
-        target[i] = ys[i]
-
-    input = torch.Tensor(xs)
-
-    return Variable(input), Variable(target)
-
 def pad_feat(seq, max_len):
     seq += [[0.0 for _ in range(N_FEAT)] for i in range(max_len - len(seq))]
     return seq
 
+
 def pad_label(seq, max_len):
     seq += [0 for i in range(max_len - len(seq))]
     return seq
+
 
 def make_batch(xss, yss):
     # xss: batch_size x len x n_feat
@@ -60,7 +53,11 @@ def make_batch(xss, yss):
     xss_var = Variable(torch.FloatTensor(xss_pad))
     yss_var = Variable(torch.LongTensor(yss_pad))
 
+    if USE_CUDA:
+        xss_var, yss_var = xss_var.cuda(), yss_var.cuda()
+
     return xss_var, yss_var, lens
+
 
 def time_since(since):
     s = time.time() - since
