@@ -23,7 +23,7 @@ class BRNN(nn.Module):
         self.dropout = dropout
 
         self.lstm = nn.LSTM(input_size,
-                            hidden_size,
+                            hidden_size // 2,
                             n_layers,
                             batch_first=True,
                             dropout=self.dropout,
@@ -47,8 +47,8 @@ class BRNN(nn.Module):
         return output, hc
 
     def init_hidden(self):
-        h0 = Variable(torch.zeros(self.n_layers, self.batch_size, self.hidden_size))
-        c0 = Variable(torch.zeros(self.n_layers, self.batch_size, self.hidden_size))
+        h0 = Variable(torch.zeros(self.n_layers * 2, self.batch_size, self.hidden_size // 2))
+        c0 = Variable(torch.zeros(self.n_layers * 2, self.batch_size, self.hidden_size // 2))
         if USE_CUDA:
             h0, c0 = h0.cuda(), c0.cuda()
         return (h0, c0)

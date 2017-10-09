@@ -52,8 +52,10 @@ class TIMIT():
             # yss: [[label * seqlen] * BATCH]
             xss = [p[1] for p in self.tr_set[i: i+batch_size]]
             xss += [[[0 for _ in range(self.N_FEAT)]] for _ in range(batch_size - len(xss))]
+
             yss = [p[0] for p in self.tr_set[i: i+batch_size]]
             yss += [[0] for _ in range(batch_size - len(yss))]
+
             sz = len(self.tr_set[i: i+batch_size])
             return xss, yss, sz
         elif type == "va":
@@ -61,8 +63,10 @@ class TIMIT():
             # yss: [[label * seqlen] * BATCH]
             xss = [p[1] for p in self.valid_set[i: i+batch_size]]
             xss += [[[0 for _ in range(self.N_FEAT)]] for _ in range(batch_size - len(xss))]
+
             yss = [p[0] for p in self.valid_set[i: i+batch_size]]
             yss += [[0] for _ in range(batch_size - len(yss))]
+
             sz = len(self.valid_set[i: i+batch_size])
             return xss, yss, sz
         elif type == "te":
@@ -70,7 +74,9 @@ class TIMIT():
             # yss: ["id" * BATCH]
             xss = [p[0] for p in self.te_set[i: i+batch_size]]
             xss += [[[0 for _ in range(self.N_FEAT)]] for _ in range(batch_size - len(xss))]
+
             ids = [p[1] for p in self.te_set[i: i+batch_size]]
             ids += ["" for _ in range(batch_size - len(ids))]
+
             sz = len(self.te_set[i: i+batch_size])
             return xss, ids, sz

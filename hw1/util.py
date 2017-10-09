@@ -10,9 +10,11 @@ def make_lab2id(fn, fn2):
     lab2id = {}
     cur_id = 1
     f2 = open(fn2)
+    good_lab = set()
     for line in f2.readlines():
         lab, nlab = line.strip().split('\t')
         if nlab not in lab2id:
+            good_lab.add(nlab)
             lab2id[nlab] = cur_id
             cur_id += 1
         lab2id[lab] = lab2id[nlab]
@@ -21,7 +23,9 @@ def make_lab2id(fn, fn2):
     id2ascii = {}
     for line in f.readlines():
         lab, id, ch = line.strip().split('\t')
-        id2ascii[lab] = ch
+        if lab in good_lab:
+            id2ascii[lab2id[lab]] = ch
+    id2ascii[0] = 'a'
     return lab2id, id2ascii
 
 
@@ -54,6 +58,25 @@ def make_batch(xss, yss, N_FEAT):
         xss_var, yss_var = xss_var.cuda(), yss_var.cuda()
 
     return xss_var, yss_var, lens
+
+
+def make_batch_te(xss, ids):
+    # xss: batch_size x len x n_feat
+    # ids: batch_size
+    seq_pairs = sorted(zip(xss, ids), key=lambda p:len(p[0]), reverse=True)
+    xss, ids = zip(*seq_pairs)
+
+    lens = [len(xs) for xs in xss]
+    max_len = max(lens)
+    xss_pad = [pad_feat(xs, max_len) for xs in xss]
+
+    # (batch_size x maxlen)
+    xss_var = Variable(torch.FloatTensor(xss_pad))
+
+    if USE_CUDA:
+        xss_var = xss_var.cuda()
+
+    return xss_var, ids, lens
 
 
 def time_since(since):
@@ -90,7 +113,7 @@ def read_data(f, lab_f, lab2id):
 
     if lab_f == None:
         res = []
-        for k in X.keys:
+        for k in X.keys():
             res.append((X[k], k))
         return res
 
