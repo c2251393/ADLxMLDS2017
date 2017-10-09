@@ -126,8 +126,8 @@ iter = 1
 eval_valid()
 for epoch in range(1, N_EPOCH + 1):
     random.shuffle(timit.tr_set)
-    for i in range(0, len(timit.tr_set), BATCH_SIZE):
-    # for i in range(0, 100, BATCH_SIZE):
+    # for i in range(0, len(timit.tr_set), BATCH_SIZE):
+    for i in range(0, 100, BATCH_SIZE):
         input, target, useful = timit.get_batch(i, BATCH_SIZE)
 
         input, target, lens = make_batch(input, target, timit.N_FEAT)
