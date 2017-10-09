@@ -23,12 +23,13 @@ class BRNN(nn.Module):
         self.dropout = dropout
 
         self.lstm = nn.LSTM(input_size,
-                            hidden_size // 2,
+                            hidden_size,
                             n_layers,
                             batch_first=True,
                             dropout=self.dropout,
                             bidirectional=True)
-        self.decoder = nn.Linear(hidden_size, output_size)
+        self.decoderlr = nn.Linear(hidden_size, output_size)
+        self.decoderrl = nn.Linear(hidden_size, output_size)
         self.softmax = nn.Softmax()
 
     def forward(self, input, hc, lens):
@@ -39,7 +40,13 @@ class BRNN(nn.Module):
 
         output.contiguous()
 
-        output = self.decoder(output.view(-1, self.hidden_size))
+        output = output.view(-1, self.hidden_size * 2)
+
+        outputlr = self.decoderlr(output[:,:self.hidden_size])
+
+        outputrl = self.decoderrl(output[:,self.hidden_size:])
+
+        output = outputlr + outputrl
         output = self.softmax(output)
 
         output = output.view(self.batch_size, -1, self.output_size)
@@ -47,8 +54,8 @@ class BRNN(nn.Module):
         return output, hc
 
     def init_hidden(self):
-        h0 = Variable(torch.zeros(self.n_layers * 2, self.batch_size, self.hidden_size // 2))
-        c0 = Variable(torch.zeros(self.n_layers * 2, self.batch_size, self.hidden_size // 2))
+        h0 = Variable(torch.zeros(self.n_layers * 2, self.batch_size, self.hidden_size))
+        c0 = Variable(torch.zeros(self.n_layers * 2, self.batch_size, self.hidden_size))
         if USE_CUDA:
             h0, c0 = h0.cuda(), c0.cuda()
         return (h0, c0)

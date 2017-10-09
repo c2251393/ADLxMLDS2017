@@ -95,22 +95,24 @@ def batch_eval(inp, target, useful, lens):
             if my_y == real_y:
                 acc += 1
 
-    return loss.data[0] / sum(lens[:useful]), acc / sum(lens[:useful])
+    return loss.data[0], acc
 
 
 def eval_valid():
     loss = 0
     acc = 0
     v_len = len(timit.valid_set)
+    tot_len = 0
     for i in range(0, v_len, BATCH_SIZE):
         input, target, useful = timit.get_batch(i, BATCH_SIZE, "va")
         input, target, lens = make_batch(input, target, timit.N_FEAT)
         tloss, tacc = batch_eval(input, target, useful, lens)
-        loss += tloss * useful
-        acc  += tacc * useful
+        loss += tloss
+        acc  += tacc
+        tot_len += sum(lens[:useful])
 
-    loss /= v_len
-    acc /= v_len
+    loss /= tot_len
+    acc /= tot_len
 
     print("  VALID LOSS %f ACC %f%%" % (loss, acc * 100))
 
