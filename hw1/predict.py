@@ -38,9 +38,9 @@ print(args.model, args.model_file, HIDDEN_SIZE, N_LAYERS, BATCH_SIZE, WINDOW_SIZ
 timit = TIMIT(args.data, "te", args.feat)
 
 if args.model == "rnn":
-    model = model_rnn.RNN(N_FEAT, HIDDEN_SIZE, N_LABEL, BATCH_SIZE, N_LAYERS, DROPOUT)
+    model = model_rnn.RNN(timit.N_FEAT, HIDDEN_SIZE, timit.N_LABEL, BATCH_SIZE, N_LAYERS, DROPOUT)
 elif args.model == "cnn":
-    model = model_cnn.CNN(N_FEAT, WINDOW_SIZE, HIDDEN_SIZE, N_LABEL, BATCH_SIZE, N_LAYERS, DROPOUT)
+    model = model_cnn.CNN(timit.N_FEAT, WINDOW_SIZE, HIDDEN_SIZE, timit.N_LABEL, BATCH_SIZE, N_LAYERS, DROPOUT)
 
 state_dict = torch.load(args.model_file, map_location=lambda storage, location: storage)
 model.load_state_dict(state_dict)
@@ -51,7 +51,7 @@ if USE_CUDA:
 
 
 def batch_pre(inp, useful, lens):
-    # inp: (BATCH_SIZE x maxlen x N_FEAT)
+    # inp: (BATCH_SIZE x maxlen x timit.N_FEAT)
     # target: (BATCH_SIZE x maxlen)
     hidden = model.init_hidden()
     output, hidden = model(inp, hidden, lens)

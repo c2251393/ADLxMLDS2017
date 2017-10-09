@@ -8,23 +8,29 @@ USE_CUDA = torch.cuda.is_available()
 # fn: 48 id ch, fn2: 48 39
 def make_lab2id(fn, fn2):
     lab2id = {}
-    cur_id = 1
+    lad2nlab = {}
     f2 = open(fn2)
     good_lab = set()
+    cur_id = 1
     for line in f2.readlines():
         lab, nlab = line.strip().split('\t')
         if nlab not in lab2id:
             good_lab.add(nlab)
-            lab2id[nlab] = cur_id
-            cur_id += 1
-        lab2id[lab] = lab2id[nlab]
+        lad2nlab[lab] = nlab
+        lab2id[lab] = cur_id
+        cur_id += 1
 
-    f = open(fn)
     id2ascii = {}
+    f = open(fn)
     for line in f.readlines():
         lab, id, ch = line.strip().split('\t')
         if lab in good_lab:
             id2ascii[lab2id[lab]] = ch
+    f = open(fn)
+    for line in f.readlines():
+        lab, id, ch = line.strip().split('\t')
+        if lab not in good_lab:
+            id2ascii[lab2id[lab]] = id2ascii[lab2id[lad2nlab[lab]]]
     id2ascii[0] = 'a'
     return lab2id, id2ascii
 

@@ -9,7 +9,7 @@ class TIMIT():
         self.N_FEAT = 39
         if feat == "fbank":
             self.N_FEAT = 69
-        self.N_LABEL = 40
+        self.N_LABEL = 48 + 1
         self.data = data_folder
 
         self.lab2id, self.id2ascii = make_lab2id(

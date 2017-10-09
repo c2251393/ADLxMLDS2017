@@ -14,7 +14,7 @@ class BRNN(nn.Module):
                  n_layers=1,
                  dropout=0.0
                  ):
-        super(RNN, self).__init__()
+        super(BRNN, self).__init__()
         self.input_size = input_size
         self.hidden_size = hidden_size
         self.output_size = output_size
