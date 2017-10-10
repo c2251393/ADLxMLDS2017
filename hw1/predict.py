@@ -8,6 +8,8 @@ from timit import *
 import random
 import model_rnn
 import model_cnn
+import model_brnn
+import model_dnn
 
 parser = argparse.ArgumentParser(description='')
 parser.add_argument('data', default='./data/',
@@ -15,7 +17,7 @@ parser.add_argument('data', default='./data/',
 parser.add_argument('feat', default='mfcc',
                     help='mfcc or fbank')
 parser.add_argument('model', default='rnn',
-                    help='model (rnn or cnn)')
+                    help='model (rnn or cnn or brnn or dnn)')
 parser.add_argument('model_file', default='rnn.pt',
                     help='model file')
 parser.add_argument('--hidden_size', type=int, default=int(30))
@@ -41,6 +43,10 @@ if args.model == "rnn":
     model = model_rnn.RNN(timit.N_FEAT, HIDDEN_SIZE, timit.N_LABEL, BATCH_SIZE, N_LAYERS, DROPOUT)
 elif args.model == "cnn":
     model = model_cnn.CNN(timit.N_FEAT, WINDOW_SIZE, HIDDEN_SIZE, timit.N_LABEL, BATCH_SIZE, N_LAYERS, DROPOUT)
+elif args.model == "brnn":
+    model = model_brnn.BRNN(timit.N_FEAT, HIDDEN_SIZE, timit.N_LABEL, BATCH_SIZE, N_LAYERS, DROPOUT)
+elif args.model == "dnn":
+    model = model_dnn.DNN(timit.N_FEAT, HIDDEN_SIZE, timit.N_LABEL, BATCH_SIZE, N_LAYERS, DROPOUT)
 
 state_dict = torch.load(args.model_file, map_location=lambda storage, location: storage)
 model.load_state_dict(state_dict)
@@ -80,7 +86,7 @@ def trim(ys):
 
 for i in range(0, len(timit.te_set), BATCH_SIZE):
     inputs, ids, useful = timit.get_batch(i, BATCH_SIZE, "te")
-    inputs, ids, lens = make_batch_te(inputs, ids)
+    inputs, ids, lens = make_batch_te(inputs, ids, timit.N_FEAT)
     # print(ids)
     res = batch_pre(inputs, useful, lens)
     for j in range(useful):

@@ -66,7 +66,7 @@ def make_batch(xss, yss, N_FEAT):
     return xss_var, yss_var, lens
 
 
-def make_batch_te(xss, ids):
+def make_batch_te(xss, ids, N_FEAT):
     # xss: batch_size x len x n_feat
     # ids: batch_size
     seq_pairs = sorted(zip(xss, ids), key=lambda p:len(p[0]), reverse=True)
@@ -74,7 +74,7 @@ def make_batch_te(xss, ids):
 
     lens = [len(xs) for xs in xss]
     max_len = max(lens)
-    xss_pad = [pad_feat(xs, max_len) for xs in xss]
+    xss_pad = [pad_feat(xs, max_len, N_FEAT) for xs in xss]
 
     # (batch_size x maxlen)
     xss_var = Variable(torch.FloatTensor(xss_pad))

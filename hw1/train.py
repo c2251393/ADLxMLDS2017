@@ -9,6 +9,7 @@ import random
 import model_rnn
 import model_cnn
 import model_brnn
+import model_dnn
 
 parser = argparse.ArgumentParser(description='')
 parser.add_argument('data', default='./data/',
@@ -16,7 +17,7 @@ parser.add_argument('data', default='./data/',
 parser.add_argument('feat', default='mfcc',
                     help='mfcc or fbank')
 parser.add_argument('model', default='rnn',
-                    help='model (rnn or cnn or brnn)')
+                    help='model (rnn or cnn or brnn or dnn)')
 parser.add_argument('--lr', type=float, default=float(0.1))
 parser.add_argument('--n_epoch', type=int, default=int(3))
 parser.add_argument('--hidden_size', type=int, default=int(20))
@@ -51,6 +52,8 @@ elif args.model == "cnn":
     model = model_cnn.CNN(timit.N_FEAT, WINDOW_SIZE, HIDDEN_SIZE, timit.N_LABEL, BATCH_SIZE, N_LAYERS, DROPOUT)
 elif args.model == "brnn":
     model = model_brnn.BRNN(timit.N_FEAT, HIDDEN_SIZE, timit.N_LABEL, BATCH_SIZE, N_LAYERS, DROPOUT)
+elif args.model == "dnn":
+    model = model_dnn.DNN(timit.N_FEAT, HIDDEN_SIZE, timit.N_LABEL, BATCH_SIZE, N_LAYERS, DROPOUT)
 
 if USE_CUDA:
     model = model.cuda()
@@ -149,7 +152,7 @@ for epoch in range(1, N_EPOCH + 1):
 
         iter += 1
     eval_valid()
-    torch.save(model.state_dict(), args.model + (".e%d.h%d.b%d.l%d.pt" % (epoch, HIDDEN_SIZE, BATCH_SIZE, N_LAYER)))
+    torch.save(model.state_dict(), args.model + (".e%d.h%d.b%d.l%d.pt" % (epoch, HIDDEN_SIZE, BATCH_SIZE, N_LAYERS)))
 
 print(all_losses)
 
