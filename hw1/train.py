@@ -71,9 +71,18 @@ def train(inp, target, useful, lens):
 
     loss = 0
 
+    # my_y = []
+
     for i in range(useful):
+        # my_ys = []
+        # tar_ys = []
         for j in range(lens[i]):
+            # my_ys.append(output[i][j].topk(1)[1].data[0])
+            # tar_ys.append(target[i][j].data[0])
             loss += criterion(output[i][j].view(1, -1), target[i][j])
+        # if i == 10:
+            # print(' '.join(map(str, my_ys)))
+            # print(' '.join(map(str, tar_ys)))
 
     loss.backward()
     opt.step()
@@ -131,8 +140,8 @@ iter = 1
 eval_valid()
 for epoch in range(1, N_EPOCH + 1):
     random.shuffle(timit.tr_set)
-    # for i in range(0, len(timit.tr_set), BATCH_SIZE):
-    for i in range(0, 100, BATCH_SIZE):
+    for i in range(0, len(timit.tr_set), BATCH_SIZE):
+    # for i in range(0, 100, BATCH_SIZE):
         input, target, useful = timit.get_batch(i, BATCH_SIZE)
 
         input, target, lens = make_batch(input, target, timit.N_FEAT)

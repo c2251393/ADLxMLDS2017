@@ -28,7 +28,7 @@ class RNN(nn.Module):
                             batch_first=True,
                             dropout=self.dropout)
         self.decoder = nn.Linear(hidden_size, output_size)
-        self.softmax = nn.Softmax()
+        # self.softmax = nn.Softmax()
 
     def forward(self, input, hc, lens):
         # input: (batch x maxlen x feat)
@@ -39,7 +39,7 @@ class RNN(nn.Module):
         output.contiguous()
 
         output = self.decoder(output.view(-1, self.hidden_size))
-        output = self.softmax(output)
+        # output = self.softmax(output)
 
         output = output.view(self.batch_size, -1, self.output_size)
 
