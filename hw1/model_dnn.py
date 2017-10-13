@@ -23,26 +23,22 @@ class DNN(nn.Module):
         self.n_layers = n_layers
         self.dropout = dropout
 
-        self.L = nn.Linear(input_size * frame_size, output_size)
-
-        # self.encoder = nn.Linear(input_size, hidden_size)
-        # if USE_CUDA:
-            # self.Ws = [nn.Linear(hidden_size, hidden_size).cuda() for _ in range(n_layers)]
-        # else:
-            # self.Ws = [nn.Linear(hidden_size, hidden_size) for _ in range(n_layers)]
-        # self.decoder = nn.Linear(hidden_size, output_size)
+        self.encoder = nn.Linear(input_size * frame_size, hidden_size)
+        if USE_CUDA:
+            self.Ws = [nn.Linear(hidden_size, hidden_size).cuda() for _ in range(n_layers)]
+        else:
+            self.Ws = [nn.Linear(hidden_size, hidden_size) for _ in range(n_layers)]
+        self.decoder = nn.Linear(hidden_size, output_size)
         # self.softmax = nn.Softmax()
 
     def forward(self, input):
         # input: (batch x frame x feat)
 
-        output = F.relu(self.L(input.view(self.batch_size, -1)))
+        input = F.relu(self.encoder(input.view(self.batch_size, -1)))
 
-        # inputs = F.relu(self.encoder(inputs))
+        for i in range(self.n_layers):
+            input = F.relu(self.Ws[i](input))
 
-        # for i in range(self.n_layers):
-            # inputs = F.relu(self.Ws[i](inputs))
-
-        # output = self.decoder(inputs)
+        output = self.decoder(input)
 
         return output
