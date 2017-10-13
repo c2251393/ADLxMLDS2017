@@ -8,6 +8,7 @@ from util import *
 class DNN(nn.Module):
     def __init__(self,
                  input_size,
+                 frame_size,
                  hidden_size, 
                  output_size,
                  batch_size,
@@ -22,33 +23,26 @@ class DNN(nn.Module):
         self.n_layers = n_layers
         self.dropout = dropout
 
+        self.L = nn.Linear(input_size * frame_size, output_size)
 
-        self.encoder = nn.Linear(input_size, hidden_size)
-        self.act = nn.ReLU()
-        if USE_CUDA:
-            self.Ws = [nn.Linear(hidden_size, hidden_size).cuda() for _ in range(n_layers)]
-        else:
-            self.Ws = [nn.Linear(hidden_size, hidden_size) for _ in range(n_layers)]
-        self.decoder = nn.Linear(hidden_size, output_size)
+        # self.encoder = nn.Linear(input_size, hidden_size)
+        # if USE_CUDA:
+            # self.Ws = [nn.Linear(hidden_size, hidden_size).cuda() for _ in range(n_layers)]
+        # else:
+            # self.Ws = [nn.Linear(hidden_size, hidden_size) for _ in range(n_layers)]
+        # self.decoder = nn.Linear(hidden_size, output_size)
         # self.softmax = nn.Softmax()
 
-    def forward(self, input, hc, lens):
-        # input: (batch x maxlen x feat)
+    def forward(self, input):
+        # input: (batch x frame x feat)
 
-        input = input.view(-1, self.input_size)
+        output = F.relu(self.L(input.view(self.batch_size, -1)))
 
-        input = self.act(self.encoder(input))
+        # inputs = F.relu(self.encoder(inputs))
 
-        for i in range(self.n_layers):
-            input = self.act(self.Ws[i](input))
+        # for i in range(self.n_layers):
+            # inputs = F.relu(self.Ws[i](inputs))
 
-        output = self.decoder(input)
-        # output = output.view(-1, self.output_size)
-        # output = self.softmax(output)
+        # output = self.decoder(inputs)
 
-        output = output.view(self.batch_size, -1, self.output_size)
-
-        return output, hc
-
-    def init_hidden(self):
-        return (None, None)
+        return output

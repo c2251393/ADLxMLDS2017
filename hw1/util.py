@@ -35,6 +35,20 @@ def make_lab2id(fn, fn2):
     return lab2id, id2ascii
 
 
+def get_pad(seq, i, lsz, rsz, pad):
+    l = i - lsz
+    r = i + rsz + 1
+    LP, RP = [], []
+    if l < 0:
+        LP = [pad for _ in range(-l)]
+        l = 0
+    if r > len(seq):
+        RP = [pad for _ in range(r - len(seq))]
+        r = len(seq)
+    res = seq[l:r]
+    return LP + res + RP
+
+
 def pad_feat(seq, max_len, N_FEAT):
     seq += [[0.0 for _ in range(N_FEAT)] for i in range(max_len - len(seq))]
     return seq

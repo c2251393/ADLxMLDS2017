@@ -24,7 +24,10 @@ class CNN(nn.Module):
         self.n_layers = n_layers
         self.dropout = dropout
 
-        self.conv = nn.Conv2d(1, 1,
+        self.conv1 = nn.Conv2d(1, 1,
+                              window_size,
+                              padding=(window_size[0] // 2, 0))
+        self.conv2 = nn.Conv2d(1, 1,
                               window_size,
                               padding=(window_size[0] // 2, 0))
 
@@ -35,11 +38,10 @@ class CNN(nn.Module):
                             dropout=self.dropout)
 
         self.decoder = nn.Linear(hidden_size, output_size)
-        # self.softmax = nn.Softmax()
 
     def forward(self, input, hc, lens):
         # input: (batch x maxlen x feat)
-        input = self.conv(input.view(self.batch_size, 1, -1, self.input_size))
+        input = self.conv1(input.view(self.batch_size, 1, -1, self.input_size))
         input = input.view(self.batch_size, -1, self.input_size - self.window_size[1] + 1)
         input = F.relu(input)
 
@@ -48,9 +50,11 @@ class CNN(nn.Module):
         output, _ = pad_packed_sequence(output_p, batch_first=True)
 
         output.contiguous()
+
         output = self.decoder(output.view(-1, self.hidden_size))
-        # output = self.softmax(output)
+
         output = output.view(self.batch_size, -1, self.output_size)
+
         return output, hc
 
     def init_hidden(self):

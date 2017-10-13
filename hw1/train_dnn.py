@@ -16,43 +16,35 @@ parser.add_argument('data', default='./data/',
                     help='data folder')
 parser.add_argument('feat', default='mfcc',
                     help='mfcc or fbank')
-parser.add_argument('model', default='rnn',
-                    help='model (rnn or cnn or brnn or dnn)')
 parser.add_argument('--lr', type=float, default=float(0.1))
 parser.add_argument('--n_epoch', type=int, default=int(3))
 parser.add_argument('--hidden_size', type=int, default=int(20))
 parser.add_argument('--n_layers', type=int, default=int(1))
 parser.add_argument('--batch_size', type=int, default=int(32))
+parser.add_argument('--frame_size', type=int, default=int(17))
 parser.add_argument('--window_size_x', type=int, default=int(3))
 parser.add_argument('--window_size_y', type=int, default=int(2))
 parser.add_argument('--dropout', type=float, default=int(0.0))
 
 args = parser.parse_args()
 
-
 LR = args.lr
 N_EPOCH = args.n_epoch
 HIDDEN_SIZE = args.hidden_size
+FRAME_SIZE = args.frame_size
 WINDOW_SIZE = (args.window_size_x, args.window_size_y)
 BATCH_SIZE = args.batch_size
 N_LAYERS = args.n_layers
 DROPOUT = args.dropout
 
-print_every = 1
+print_every = 100
 plot_every = 10
 
-print(args.model, args.feat, LR, N_EPOCH, HIDDEN_SIZE, N_LAYERS, BATCH_SIZE, WINDOW_SIZE, DROPOUT)
+print(args.feat, LR, N_EPOCH, HIDDEN_SIZE, N_LAYERS, BATCH_SIZE, FRAME_SIZE, WINDOW_SIZE, DROPOUT)
 
 timit = TIMIT(args.data, "tr", args.feat)
 
-if args.model == "rnn":
-    model = model_rnn.RNN(timit.N_FEAT, HIDDEN_SIZE, timit.N_LABEL, BATCH_SIZE, N_LAYERS, DROPOUT)
-elif args.model == "cnn":
-    model = model_cnn.CNN(timit.N_FEAT, WINDOW_SIZE, HIDDEN_SIZE, timit.N_LABEL, BATCH_SIZE, N_LAYERS, DROPOUT)
-elif args.model == "brnn":
-    model = model_brnn.BRNN(timit.N_FEAT, HIDDEN_SIZE, timit.N_LABEL, BATCH_SIZE, N_LAYERS, DROPOUT)
-elif args.model == "dnn":
-    model = model_dnn.DNN(timit.N_FEAT, HIDDEN_SIZE, timit.N_LABEL, BATCH_SIZE, N_LAYERS, DROPOUT)
+model = model_dnn.DNN(timit.N_FEAT, FRAME_SIZE, HIDDEN_SIZE, timit.N_LABEL, BATCH_SIZE, N_LAYERS, DROPOUT)
 
 if USE_CUDA:
     model = model.cuda()
@@ -61,44 +53,38 @@ opt = torch.optim.Adam(model.parameters(), lr = LR)
 criterion = nn.CrossEntropyLoss(timit.label_wt())
 # criterion = nn.CrossEntropyLoss()
 
-def train(inp, target, useful, lens):
-    # inp: (BATCH_SIZE x maxlen x N_FEAT)
-    # target: (BATCH_SIZE x maxlen)
+def train(inp, target, useful):
+    # inp: (BATCH_SIZE x frame x N_FEAT)
+    # target: (BATCH_SIZE)
+    if USE_CUDA:
+        inp.cuda()
+        target.cuda()
     model.train()
-    hidden = model.init_hidden()
-    model.zero_grad()
-    output, hidden = model(inp, hidden, lens)
+    opt.zero_grad()
+    output = model(inp)
 
-    loss = 0
-
-    for i in range(useful):
-        for j in range(lens[i]):
-            loss += criterion(output[i][j].view(1, -1), target[i][j])
+    loss = criterion(output[:useful], target[:useful])
 
     loss.backward()
     opt.step()
 
-    return loss.data[0] / sum(lens[:useful])
+    return loss.data[0]
 
 
-def batch_eval(inp, target, useful, lens):
+def batch_eval(inp, target, useful):
     # inp: (BATCH_SIZE x maxlen x N_FEAT)
     # target: (BATCH_SIZE x maxlen)
-    hidden = model.init_hidden()
-    output, hidden = model(inp, hidden, lens)
+    if USE_CUDA:
+        inp.cuda()
+        target.cuda()
+    output = model(inp)
 
-    acc = 0
-    loss = 0
+    loss = criterion(output[:useful], target[:useful]).data[0]
 
-    for i in range(useful):
-        for j in range(lens[i]):
-            loss += criterion(output[i][j].view(1, -1), target[i][j])
-            my_y = output[i][j].topk(1)[1].data[0]
-            real_y = target[i][j].data[0]
-            if my_y == real_y:
-                acc += 1
+    my_y = output.max(1)[1]
+    acc = sum(my_y[:useful] == target[:useful]).data[0] / useful
 
-    return loss.data[0], acc
+    return loss, acc
 
 
 def eval_valid():
@@ -108,12 +94,13 @@ def eval_valid():
     tot_len = 0
     model.eval()
     for i in range(0, v_len, BATCH_SIZE):
-        input, target, useful = timit.get_batch(i, BATCH_SIZE, "va")
-        input, target, lens = make_batch(input, target, timit.N_FEAT)
-        tloss, tacc = batch_eval(input, target, useful, lens)
-        loss += tloss
-        acc  += tacc
-        tot_len += sum(lens[:useful])
+        xss, yss, useful = timit.get_flat_batch(i, BATCH_SIZE, FRAME_SIZE, "va")
+        X = Variable(torch.Tensor(xss))
+        Y = Variable(torch.LongTensor(yss))
+        tloss, tacc = batch_eval(X, Y, useful)
+        loss += tloss * useful
+        acc  += tacc * useful
+        tot_len += useful
 
     loss /= tot_len
     acc /= tot_len
@@ -131,14 +118,14 @@ loss_tot = 0
 iter = 1
 eval_valid()
 for epoch in range(1, N_EPOCH + 1):
-    random.shuffle(timit.tr_set)
-    for i in range(0, len(timit.tr_set), BATCH_SIZE):
-    # for i in range(0, 100, BATCH_SIZE):
-        input, target, useful = timit.get_batch(i, BATCH_SIZE)
+    random.shuffle(timit.tr_idx_set)
+    for i in range(0, len(timit.tr_idx_set), BATCH_SIZE):
+        xss, yss, useful = timit.get_flat_batch(i, BATCH_SIZE, FRAME_SIZE)
 
-        input, target, lens = make_batch(input, target, timit.N_FEAT)
+        X = Variable(torch.Tensor(xss))
+        Y = Variable(torch.LongTensor(yss))
 
-        loss = train(input, target, useful, lens)
+        loss = train(X, Y, useful)
 
         loss_avg += loss
         loss_tot += loss
@@ -156,7 +143,7 @@ for epoch in range(1, N_EPOCH + 1):
     torch.save(
         model.state_dict(),
         os.path.join("models", 
-        args.model + (".e%d.h%d.b%d.l%d.pt" % (epoch, HIDDEN_SIZE, BATCH_SIZE, N_LAYERS))))
+        ("dnn.e%d.h%d.b%d.l%d.f%d.pt" % (epoch, HIDDEN_SIZE, BATCH_SIZE, N_LAYERS, FRAME_SIZE))))
 
 print(all_losses)
 
