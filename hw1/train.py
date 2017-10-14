@@ -72,8 +72,7 @@ def train(inp, target, useful, lens):
     loss = 0
 
     for i in range(useful):
-        for j in range(lens[i]):
-            loss += criterion(output[i][j].view(1, -1), target[i][j])
+        loss += criterion(output[i][:lens[i]], target[i][:lens[i]])
 
     if USE_CUDA:
         loss.cuda()
@@ -94,14 +93,12 @@ def batch_eval(inp, target, useful, lens):
     loss = 0
 
     for i in range(useful):
-        for j in range(lens[i]):
-            loss += criterion(output[i][j].view(1, -1), target[i][j])
-            my_y = output[i][j].topk(1)[1].data[0]
-            real_y = target[i][j].data[0]
-            if my_y == real_y:
-                acc += 1
+        loss += criterion(output[i][:lens[i]], target[i][:lens[i]]).data[0]
+        my_y = output[i].max(1)[1]
+        ta_y = target[i]
+        acc += sum(my_y[:lens[i]] == ta_y[:lens[i]])
 
-    return loss.data[0], acc
+    return loss, acc
 
 
 def eval_valid():
