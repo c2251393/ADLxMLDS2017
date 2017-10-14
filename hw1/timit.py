@@ -3,6 +3,7 @@ import random
 from util import *
 from torch.nn.utils.rnn import pack_padded_sequence, pad_packed_sequence
 import os
+import copy
 
 class TIMIT():
     def __init__(self, data_folder, type="tr", feat="mfcc"):
@@ -59,7 +60,7 @@ class TIMIT():
                 res[y] += 1
         for i in range(self.N_LABEL):
             if res[i] > 0.0:
-                res[i] = 1.0 / ( res[i] ** 0.5 )
+                res[i] = 1.0 / ( res[i] )
             else:
                 res[i] = 1e9
         if USE_CUDA:
@@ -70,10 +71,10 @@ class TIMIT():
         if type == "tr":
             # xss: [[[feat * 39] * seq len] * BATCH]
             # yss: [[label * seqlen] * BATCH]
-            xss = [p[1] for p in self.tr_set[i: i+batch_size]]
+            xss = [copy.deepcopy(p[1]) for p in self.tr_set[i: i+batch_size]]
             xss += [[[0 for _ in range(self.N_FEAT)]] for _ in range(batch_size - len(xss))]
 
-            yss = [p[0] for p in self.tr_set[i: i+batch_size]]
+            yss = [copy.deepcopy(p[0]) for p in self.tr_set[i: i+batch_size]]
             yss += [[0] for _ in range(batch_size - len(yss))]
 
             sz = len(self.tr_set[i: i+batch_size])
@@ -81,10 +82,10 @@ class TIMIT():
         elif type == "va":
             # xss: [[[feat * 39] * seq len] * BATCH]
             # yss: [[label * seqlen] * BATCH]
-            xss = [p[1] for p in self.valid_set[i: i+batch_size]]
+            xss = [copy.deepcopy(p[1]) for p in self.valid_set[i: i+batch_size]]
             xss += [[[0 for _ in range(self.N_FEAT)]] for _ in range(batch_size - len(xss))]
 
-            yss = [p[0] for p in self.valid_set[i: i+batch_size]]
+            yss = [copy.deepcopy(p[0]) for p in self.valid_set[i: i+batch_size]]
             yss += [[0] for _ in range(batch_size - len(yss))]
 
             sz = len(self.valid_set[i: i+batch_size])
@@ -92,10 +93,10 @@ class TIMIT():
         elif type == "te":
             # xss: [[[feat * 39] * seq len] * BATCH]
             # yss: ["id" * BATCH]
-            xss = [p[0] for p in self.te_set[i: i+batch_size]]
+            xss = [copy.deepcopy(p[0]) for p in self.te_set[i: i+batch_size]]
             xss += [[[0 for _ in range(self.N_FEAT)]] for _ in range(batch_size - len(xss))]
 
-            ids = [p[1] for p in self.te_set[i: i+batch_size]]
+            ids = [copy.deepcopy(p[1]) for p in self.te_set[i: i+batch_size]]
             ids += ["" for _ in range(batch_size - len(ids))]
 
             sz = len(self.te_set[i: i+batch_size])

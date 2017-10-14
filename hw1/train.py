@@ -38,7 +38,7 @@ BATCH_SIZE = args.batch_size
 N_LAYERS = args.n_layers
 DROPOUT = args.dropout
 
-print_every = 1
+print_every = 10
 plot_every = 10
 
 print(args.model, args.feat, LR, N_EPOCH, HIDDEN_SIZE, N_LAYERS, BATCH_SIZE, WINDOW_SIZE, DROPOUT)
@@ -55,32 +55,41 @@ elif args.model == "dnn":
     model = model_dnn.DNN(timit.N_FEAT, HIDDEN_SIZE, timit.N_LABEL, BATCH_SIZE, N_LAYERS, DROPOUT)
 
 if USE_CUDA:
-    model = model.cuda()
+    model.cuda()
 
 opt = torch.optim.Adam(model.parameters(), lr = LR)
 criterion = nn.CrossEntropyLoss(timit.label_wt())
 # criterion = nn.CrossEntropyLoss()
 
+cnt = 0
+
 def train(inp, target, useful, lens):
     # inp: (BATCH_SIZE x maxlen x N_FEAT)
     # target: (BATCH_SIZE x maxlen)
+    global cnt
     model.train()
     hidden = model.init_hidden()
     model.zero_grad()
     output, hidden = model(inp, hidden, lens)
 
     loss = 0
-
     for i in range(useful):
         loss += criterion(output[i][:lens[i]], target[i][:lens[i]])
 
+#    loss = criterion(output.view(-1, timit.N_LABEL), target.view(-1))
     if USE_CUDA:
         loss.cuda()
 
     loss.backward()
     opt.step()
 
-    return loss.data[0] / sum(lens[:useful])
+#    if cnt % print_every == 0:
+#        print(lens[5])
+#        print(list(output[5].max(1)[1].data[:lens[5]]))
+#        print(list(target[5].data[:lens[5]]))
+    cnt += 1
+
+    return loss.data[0] / useful
 
 
 def batch_eval(inp, target, useful, lens):
@@ -93,10 +102,10 @@ def batch_eval(inp, target, useful, lens):
     loss = 0
 
     for i in range(useful):
-        loss += criterion(output[i][:lens[i]], target[i][:lens[i]]).data[0]
+        loss += criterion(output[i][:lens[i]], target[i][:lens[i]]).data[0] * lens[i]
         my_y = output[i].max(1)[1]
         ta_y = target[i]
-        acc += sum(my_y[:lens[i]] == ta_y[:lens[i]])
+        acc += sum(my_y[:lens[i]] == ta_y[:lens[i]]).data[0]
 
     return loss, acc
 

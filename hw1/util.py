@@ -2,6 +2,7 @@ import time, math
 import torch
 from torch.autograd import Variable
 from torch.nn.utils.rnn import pack_padded_sequence, pad_packed_sequence
+import copy
 
 USE_CUDA = torch.cuda.is_available()
 
@@ -45,18 +46,20 @@ def get_pad(seq, i, lsz, rsz, pad):
     if r > len(seq):
         RP = [pad for _ in range(r - len(seq))]
         r = len(seq)
-    res = seq[l:r]
+    res = copy.deepcopy(seq[l:r])
     return LP + res + RP
 
 
 def pad_feat(seq, max_len, N_FEAT):
-    seq += [[0.0 for _ in range(N_FEAT)] for i in range(max_len - len(seq))]
-    return seq
+    res = copy.deepcopy(seq)
+    res += [[0.0 for _ in range(N_FEAT)] for i in range(max_len - len(seq))]
+    return res
 
 
 def pad_label(seq, max_len):
-    seq += [0 for i in range(max_len - len(seq))]
-    return seq
+    res = copy.deepcopy(seq)
+    res += [0 for i in range(max_len - len(seq))]
+    return res
 
 
 def make_batch(xss, yss, N_FEAT):
