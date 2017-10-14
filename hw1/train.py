@@ -75,6 +75,9 @@ def train(inp, target, useful, lens):
         for j in range(lens[i]):
             loss += criterion(output[i][j].view(1, -1), target[i][j])
 
+    if USE_CUDA:
+        loss.cuda()
+
     loss.backward()
     opt.step()
 
