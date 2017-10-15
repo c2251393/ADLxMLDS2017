@@ -110,7 +110,7 @@ def batch_eval(inp, target, useful, lens):
     return loss, acc
 
 
-def eval_valid():
+def eval_valid(epoch):
     loss = 0
     acc = 0
     v_len = len(timit.valid_set)
@@ -127,7 +127,7 @@ def eval_valid():
     loss /= tot_len
     acc /= tot_len
 
-    print("  VALID LOSS %f ACC %f%%" % (loss, acc * 100))
+    print("  epoch %d VALID LOSS %f ACC %f%%" % (epoch, loss, acc * 100))
 
     return loss, acc
 
@@ -161,7 +161,7 @@ for epoch in range(1, N_EPOCH + 1):
             loss_avg = 0
 
         iter += 1
-    eval_valid()
+    eval_valid(epoch)
     torch.save(
         model.state_dict(),
         os.path.join("models", 
