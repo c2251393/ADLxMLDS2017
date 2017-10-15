@@ -165,7 +165,7 @@ for epoch in range(1, N_EPOCH + 1):
     torch.save(
         model.state_dict(),
         os.path.join("models", 
-        args.model + (".e%d.h%d.b%d.l%d.pt" % (epoch, HIDDEN_SIZE, BATCH_SIZE, N_LAYERS))))
+        args.model + ("%s.e%d.h%d.b%d.l%d.pt" % (args.feat, epoch, HIDDEN_SIZE, BATCH_SIZE, N_LAYERS))))
 
 print(all_losses)
 
