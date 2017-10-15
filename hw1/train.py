@@ -83,10 +83,10 @@ def train(inp, target, useful, lens):
     loss.backward()
     opt.step()
 
-#    if cnt % print_every == 0:
-#        print(lens[5])
-#        print(list(output[5].max(1)[1].data[:lens[5]]))
-#        print(list(target[5].data[:lens[5]]))
+    if cnt % print_every == 0:
+        print(lens[5])
+        print(list(output[5].max(1)[1].data[:lens[5]]))
+        print(list(target[5].data[:lens[5]]))
     cnt += 1
 
     return loss.data[0] / useful
@@ -138,7 +138,7 @@ all_losses = []
 loss_tot = 0
 
 iter = 1
-eval_valid()
+eval_valid(0)
 for epoch in range(1, N_EPOCH + 1):
     random.shuffle(timit.tr_set)
     for i in range(0, len(timit.tr_set), BATCH_SIZE):
