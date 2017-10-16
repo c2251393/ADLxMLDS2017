@@ -164,10 +164,14 @@ for epoch in range(1, N_EPOCH + 1):
 
         iter += 1
     eval_valid(epoch)
-    torch.save(
-        model.state_dict(),
-        os.path.join("models", 
-        args.model + ("%s.e%d.h%d.b%d.l%d.pt" % (args.feat, epoch, HIDDEN_SIZE, BATCH_SIZE, N_LAYERS))))
+    model_name = args.model
+    if args.model == "cnn":
+        model_name += (".%s.e%d.h%d.b%d.l%d.wx%d.wy%d.p%d.pt" % (
+            args.feat, epoch, HIDDEN_SIZE, BATCH_SIZE, N_LAYERS, WINDOW_SIZE[0], WINDOW_SIZE[1], POOL_SIZE))
+    else:
+        model_name += (".%s.e%d.h%d.b%d.l%d.d%g.pt" % (
+            args.feat, epoch, HIDDEN_SIZE, BATCH_SIZE, N_LAYERS, DROPOUT))
+    torch.save(model.state_dict(), os.path.join("models", model_name))
 
 print(all_losses)
 
