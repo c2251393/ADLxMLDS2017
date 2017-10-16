@@ -51,15 +51,13 @@ def get_pad(seq, i, lsz, rsz, pad):
 
 
 def pad_feat(seq, max_len, N_FEAT):
-    res = copy.deepcopy(seq)
-    res += [[0.0 for _ in range(N_FEAT)] for i in range(max_len - len(seq))]
-    return res
+    seq += [[0.0 for _ in range(N_FEAT)] for i in range(max_len - len(seq))]
+    return seq
 
 
 def pad_label(seq, max_len):
-    res = copy.deepcopy(seq)
-    res += [0 for i in range(max_len - len(seq))]
-    return res
+    seq += [0 for i in range(max_len - len(seq))]
+    return seq
 
 
 def make_batch(xss, yss, N_FEAT):

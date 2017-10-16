@@ -18,14 +18,15 @@ parser.add_argument('feat', default='mfcc',
                     help='mfcc or fbank')
 parser.add_argument('model', default='rnn',
                     help='model (rnn or cnn or brnn or dnn)')
-parser.add_argument('--lr', type=float, default=float(0.1))
-parser.add_argument('--n_epoch', type=int, default=int(3))
-parser.add_argument('--hidden_size', type=int, default=int(20))
-parser.add_argument('--n_layers', type=int, default=int(1))
-parser.add_argument('--batch_size', type=int, default=int(32))
-parser.add_argument('--window_size_x', type=int, default=int(3))
-parser.add_argument('--window_size_y', type=int, default=int(2))
-parser.add_argument('--dropout', type=float, default=int(0.0))
+parser.add_argument('-l', '--lr', type=float, default=float(0.1))
+parser.add_argument('-e', '--n_epoch', type=int, default=int(3))
+parser.add_argument('-wx', '--window_size_x', type=int, default=int(3))
+parser.add_argument('-wy', '--window_size_y', type=int, default=int(2))
+parser.add_argument('-p', '--pool_size', type=int, default=int(2))
+parser.add_argument('-H', '--hidden_size', type=int, default=int(20))
+parser.add_argument('-b', '--batch_size', type=int, default=int(32))
+parser.add_argument('-n', '--n_layers', type=int, default=int(1))
+parser.add_argument('-d', '--dropout', type=float, default=int(0.0))
 
 args = parser.parse_args()
 
@@ -33,6 +34,7 @@ args = parser.parse_args()
 LR = args.lr
 N_EPOCH = args.n_epoch
 HIDDEN_SIZE = args.hidden_size
+POOL_SIZE = args.pool_size
 WINDOW_SIZE = (args.window_size_x, args.window_size_y)
 BATCH_SIZE = args.batch_size
 N_LAYERS = args.n_layers
@@ -48,7 +50,7 @@ timit = TIMIT(args.data, "tr", args.feat)
 if args.model == "rnn":
     model = model_rnn.RNN(timit.N_FEAT, HIDDEN_SIZE, timit.N_LABEL, BATCH_SIZE, N_LAYERS, DROPOUT)
 elif args.model == "cnn":
-    model = model_cnn.CNN(timit.N_FEAT, WINDOW_SIZE, HIDDEN_SIZE, timit.N_LABEL, BATCH_SIZE, N_LAYERS, DROPOUT)
+    model = model_cnn.CNN(timit.N_FEAT, WINDOW_SIZE, POOL_SIZE, HIDDEN_SIZE, timit.N_LABEL, BATCH_SIZE, N_LAYERS, DROPOUT)
 elif args.model == "brnn":
     model = model_brnn.BRNN(timit.N_FEAT, HIDDEN_SIZE, timit.N_LABEL, BATCH_SIZE, N_LAYERS, DROPOUT)
 elif args.model == "dnn":
@@ -138,7 +140,7 @@ all_losses = []
 loss_tot = 0
 
 iter = 1
-eval_valid()
+eval_valid(0)
 for epoch in range(1, N_EPOCH + 1):
     random.shuffle(timit.tr_set)
     for i in range(0, len(timit.tr_set), BATCH_SIZE):

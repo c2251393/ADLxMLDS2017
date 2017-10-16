@@ -9,6 +9,7 @@ class CNN(nn.Module):
     def __init__(self,
                  input_size,
                  window_size,
+                 pool_size,
                  hidden_size,
                  output_size,
                  batch_size,
@@ -18,20 +19,20 @@ class CNN(nn.Module):
         super(CNN, self).__init__()
         self.input_size = input_size
         self.window_size = window_size
+        self.pool_size = pool_size
         self.hidden_size = hidden_size
         self.output_size = output_size
         self.batch_size = batch_size
         self.n_layers = n_layers
         self.dropout = dropout
 
-        self.conv1 = nn.Conv2d(1, 1,
+        self.conv = nn.Conv2d(1, 1,
                               window_size,
                               padding=(window_size[0] // 2, 0))
-        self.conv2 = nn.Conv2d(1, 1,
-                              window_size,
-                              padding=(window_size[0] // 2, 0))
+        self.pool = nn.MaxPool1d(pool_size)
+        self.relu = nn.ReLU()
 
-        self.lstm = nn.LSTM(input_size - window_size[1] + 1,
+        self.lstm = nn.LSTM((input_size - window_size[1] + 1) // pool_size,
                             hidden_size,
                             n_layers,
                             batch_first=True,
@@ -41,9 +42,14 @@ class CNN(nn.Module):
 
     def forward(self, input, hc, lens):
         # input: (batch x maxlen x feat)
-        input = self.conv1(input.view(self.batch_size, 1, -1, self.input_size))
+        input = self.conv(input.view(self.batch_size, 1, -1, self.input_size))
+        # input: (batch, 1, maxlen, feat - window[1] + 1)
         input = input.view(self.batch_size, -1, self.input_size - self.window_size[1] + 1)
-        input = F.relu(input)
+        # input: (batch, maxlen, feat - window[1] + 1)
+        input = self.pool(input)
+        # input: (batch, maxlen, (feat - window[1] + 1) / pool_size)
+        input = self.relu(input)
+        # input: (batch, maxlen, (feat - window[1] + 1) / pool_size)
 
         input_p = pack_padded_sequence(input, lens, batch_first=True)
         output_p, hc = self.lstm(input_p, hc)
