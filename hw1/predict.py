@@ -54,7 +54,7 @@ model.load_state_dict(state_dict)
 model = model.eval()
 
 if USE_CUDA:
-    model = model.cuda()
+    model.cuda()
 
 
 def batch_pre(inp, useful, lens):
@@ -85,9 +85,9 @@ def trim(ys):
         pre = y
     if len(res) == 1:
         return res
-    if res[0] == timit.lab2id['sil']:
+    if res[0] == timit.id2ascii[timit.lab2id['sil']]:
         res = res[1:]
-    if res[-1] == timit.lab2id['sil']:
+    if res[-1] == timit.id2ascii[timit.lab2id['sil']]:
         res = res[:-1]
     return res
 
@@ -97,8 +97,9 @@ for i in range(0, len(timit.te_set), BATCH_SIZE):
     # print(ids)
     res = batch_pre(inputs, useful, lens)
     for j in range(useful):
-        res[j] = trim(res[j])
-        f.write("%s,%s\n" % (ids[j], ''.join(timit.id2ascii[y] for y in res[j])))
+        ans = ''.join(timit.id2ascii[y] for y in res[j])
+        ans = ''.join(trim(ans))
+        f.write("%s,%s\n" % (ids[j], ans))
 
 f.close()
 
