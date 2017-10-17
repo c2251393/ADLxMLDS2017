@@ -21,17 +21,19 @@ parser.add_argument('model', default='rnn',
                     help='model (rnn or cnn or brnn or dnn)')
 parser.add_argument('model_file', default='rnn.pt',
                     help='model file')
-parser.add_argument('--hidden_size', type=int, default=int(30))
-parser.add_argument('--n_layers', type=int, default=int(2))
-parser.add_argument('--batch_size', type=int, default=int(32))
-parser.add_argument('--window_size_x', type=int, default=int(3))
-parser.add_argument('--window_size_y', type=int, default=int(2))
-parser.add_argument('--dropout', type=float, default=int(0.0))
+parser.add_argument('-wx', '--window_size_x', type=int, default=int(3))
+parser.add_argument('-wy', '--window_size_y', type=int, default=int(2))
+parser.add_argument('-p', '--pool_size', type=int, default=int(2))
+parser.add_argument('-H', '--hidden_size', type=int, default=int(20))
+parser.add_argument('-b', '--batch_size', type=int, default=int(32))
+parser.add_argument('-n', '--n_layers', type=int, default=int(1))
+parser.add_argument('-d', '--dropout', type=float, default=int(0.0))
 args = parser.parse_args()
 
 
 HIDDEN_SIZE = args.hidden_size
 WINDOW_SIZE = (args.window_size_x, args.window_size_y)
+POOL_SIZE = args.pool_size
 BATCH_SIZE = args.batch_size
 N_LAYERS = args.n_layers
 DROPOUT = args.dropout
@@ -43,7 +45,7 @@ timit = TIMIT(args.data, "te", args.feat)
 if args.model == "rnn":
     model = model_rnn.RNN(timit.N_FEAT, HIDDEN_SIZE, timit.N_LABEL, BATCH_SIZE, N_LAYERS, DROPOUT)
 elif args.model == "cnn":
-    model = model_cnn.CNN(timit.N_FEAT, WINDOW_SIZE, HIDDEN_SIZE, timit.N_LABEL, BATCH_SIZE, N_LAYERS, DROPOUT)
+    model = model_cnn.CNN(timit.N_FEAT, WINDOW_SIZE, POOL_SIZE, HIDDEN_SIZE, timit.N_LABEL, BATCH_SIZE, N_LAYERS, DROPOUT)
 elif args.model == "brnn":
     model = model_brnn.BRNN(timit.N_FEAT, HIDDEN_SIZE, timit.N_LABEL, BATCH_SIZE, N_LAYERS, DROPOUT)
 elif args.model == "dnn":
