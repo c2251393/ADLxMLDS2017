@@ -11,7 +11,8 @@ class TIMIT():
         self.N_FEAT = 39
         if feat == "fbank":
             self.N_FEAT = 69
-        self.N_LABEL = 48 + 1
+        # self.N_LABEL = 48 + 1
+        self.N_LABEL = 39 + 1
         self.data = data_folder
 
         self.lab2id, self.id2ascii = make_lab2id(
@@ -54,15 +55,17 @@ class TIMIT():
 
 
     def label_wt(self):
-        res = torch.zeros(self.N_LABEL)
-        for (ys, _, _) in self.tr_set:
-            for y in ys:
-                res[y] += 1
-        for i in range(self.N_LABEL):
-            if res[i] > 0.0:
-                res[i] = 1.0 / ( res[i] )
-            else:
-                res[i] = 1e9
+        # res = torch.zeros(self.N_LABEL)
+        # for (ys, _, _) in self.tr_set:
+            # for y in ys:
+                # res[y] += 1
+        # for i in range(self.N_LABEL):
+            # if res[i] > 0.0:
+                # res[i] = 1.0 / ( res[i] )
+            # else:
+                # res[i] = 1e9
+        res = torch.ones(self.N_LABEL)
+        res[self.lab2id['sil']] = 0.3
         if USE_CUDA:
             res = res.cuda()
         return res

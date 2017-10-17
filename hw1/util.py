@@ -17,9 +17,12 @@ def make_lab2id(fn, fn2):
         lab, nlab = line.strip().split('\t')
         if nlab not in lab2id:
             good_lab.add(nlab)
-        lad2nlab[lab] = nlab
-        lab2id[lab] = cur_id
-        cur_id += 1
+            lab2id[nlab] = cur_id
+            cur_id += 1
+        lab2id[lab] = lab2id[nlab]
+        # lad2nlab[lab] = nlab
+        # lab2id[lab] = cur_id
+        # cur_id += 1
 
     id2ascii = {}
     f = open(fn)
@@ -27,11 +30,11 @@ def make_lab2id(fn, fn2):
         lab, id, ch = line.strip().split('\t')
         if lab in good_lab:
             id2ascii[lab2id[lab]] = ch
-    f = open(fn)
-    for line in f.readlines():
-        lab, id, ch = line.strip().split('\t')
-        if lab not in good_lab:
-            id2ascii[lab2id[lab]] = id2ascii[lab2id[lad2nlab[lab]]]
+    # f = open(fn)
+    # for line in f.readlines():
+        # lab, id, ch = line.strip().split('\t')
+        # if lab not in good_lab:
+            # id2ascii[lab2id[lab]] = id2ascii[lab2id[lad2nlab[lab]]]
     id2ascii[0] = 'a'
     return lab2id, id2ascii
 
