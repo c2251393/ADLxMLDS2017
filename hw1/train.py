@@ -61,38 +61,8 @@ if USE_CUDA:
 
 opt = torch.optim.Adam(model.parameters(), lr = LR)
 criterion = nn.CrossEntropyLoss(timit.label_wt())
-# criterion = nn.CrossEntropyLoss()
 
 cnt = 0
-
-def train(inp, target, useful, lens):
-    # inp: (BATCH_SIZE x maxlen x N_FEAT)
-    # target: (BATCH_SIZE x maxlen)
-    global cnt
-    model.train()
-    hidden = model.init_hidden()
-    model.zero_grad()
-    output, hidden = model(inp, hidden, lens)
-
-    loss = 0
-    for i in range(useful):
-        loss += criterion(output[i][:lens[i]], target[i][:lens[i]])
-
-#    loss = criterion(output.view(-1, timit.N_LABEL), target.view(-1))
-    if USE_CUDA:
-        loss.cuda()
-
-    loss.backward()
-    opt.step()
-
-    if cnt % print_every == 0:
-        print(lens[5])
-        print(list(output[5].max(1)[1].data[:lens[5]]))
-        print(list(target[5].data[:lens[5]]))
-    cnt += 1
-
-    return loss.data[0] / useful
-
 
 def batch_eval(inp, target, useful, lens):
     # inp: (BATCH_SIZE x maxlen x N_FEAT)
@@ -143,18 +113,31 @@ iter = 1
 eval_valid(0)
 for epoch in range(1, N_EPOCH + 1):
     random.shuffle(timit.tr_set)
+    model.train()
     for i in range(0, len(timit.tr_set), BATCH_SIZE):
-    # for i in range(0, 100, BATCH_SIZE):
         input, target, useful = timit.get_batch(i, BATCH_SIZE)
 
         input, target, lens = make_batch(input, target, timit.N_FEAT)
 
-        loss = train(input, target, useful, lens)
+        opt.zero_grad()
+        output, hidden = model(input, hidden, lens)
+        loss = 0
+        for j in range(useful):
+            loss += criterion(output[j][:lens[j]], target[j][:lens[j]])
+
+        if USE_CUDA:
+            loss.cuda()
+
+        loss.backward()
+        opt.step()
+
+        loss = loss.data[0]
 
         loss_avg += loss
         loss_tot += loss
 
         if iter % print_every == 0:
+            print(list(output[0].data.max(1)[1][:40]), list(target[0].data[:40]))
             print('[%s (%d %d%%) %.4f %.4f]' %
                   (time_since(start), iter, iter / (N_EPOCH * len(timit.tr_set)) * 100, loss, loss_tot / iter))
 
@@ -163,14 +146,17 @@ for epoch in range(1, N_EPOCH + 1):
             loss_avg = 0
 
         iter += 1
+
     eval_valid(epoch)
     model_name = args.model
+
     if args.model == "cnn":
         model_name += (".%s.e%d.h%d.b%d.l%d.wx%d.wy%d.p%d.pt" % (
             args.feat, epoch, HIDDEN_SIZE, BATCH_SIZE, N_LAYERS, WINDOW_SIZE[0], WINDOW_SIZE[1], POOL_SIZE))
     else:
         model_name += (".%s.e%d.h%d.b%d.l%d.d%g.pt" % (
             args.feat, epoch, HIDDEN_SIZE, BATCH_SIZE, N_LAYERS, DROPOUT))
+
     torch.save(model.state_dict(), os.path.join("models", model_name))
 
 print(all_losses)

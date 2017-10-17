@@ -3,6 +3,7 @@ import torch
 from torch.autograd import Variable
 from torch.nn.utils.rnn import pack_padded_sequence, pad_packed_sequence
 import copy
+import numpy as np
 
 USE_CUDA = torch.cuda.is_available()
 
@@ -20,9 +21,6 @@ def make_lab2id(fn, fn2):
             lab2id[nlab] = cur_id
             cur_id += 1
         lab2id[lab] = lab2id[nlab]
-        # lad2nlab[lab] = nlab
-        # lab2id[lab] = cur_id
-        # cur_id += 1
 
     id2ascii = {}
     f = open(fn)
@@ -30,11 +28,6 @@ def make_lab2id(fn, fn2):
         lab, id, ch = line.strip().split('\t')
         if lab in good_lab:
             id2ascii[lab2id[lab]] = ch
-    # f = open(fn)
-    # for line in f.readlines():
-        # lab, id, ch = line.strip().split('\t')
-        # if lab not in good_lab:
-            # id2ascii[lab2id[lab]] = id2ascii[lab2id[lad2nlab[lab]]]
     id2ascii[0] = 'a'
     return lab2id, id2ascii
 
@@ -111,9 +104,11 @@ def time_since(since):
 
 
 def read_data(f, lab_f, lab2id):
+    print(f, lab_f)
     X = {}
     y = {}
     with open(f, 'r') as f:
+        cnt = 0
         for line in f.readlines():
             words = line[:-1].split()
             frame_id = words[0]
@@ -134,6 +129,10 @@ def read_data(f, lab_f, lab2id):
             if id not in X:
                 X[id] = []
             X[id].append(feat)
+
+            if cnt % 10000 == 0:
+                print(frame_id, id, feat)
+            cnt += 1
 
     if lab_f == None:
         res = []
@@ -156,6 +155,7 @@ def read_data(f, lab_f, lab2id):
 
     res = []
     for k in X.keys():
+        print(k, len(y[k]))
         res.append((y[k], X[k], k))
 
     return res

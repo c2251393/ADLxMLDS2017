@@ -48,22 +48,13 @@ class TIMIT():
             self.te_set = read_data(test_f, None, self.lab2id)
             self.te_idx_set = []
             for i in range(len(self.te_set)):
-                ys, _ = self.te_set[i]
-                self.te_idx_set.extend((i, j) for j in range(len(ys)))
+                xs, _ = self.te_set[i]
+                self.te_idx_set.extend((i, j) for j in range(len(xs)))
 
             print("# of testing %d" % (len(self.te_set)))
 
 
     def label_wt(self):
-        # res = torch.zeros(self.N_LABEL)
-        # for (ys, _, _) in self.tr_set:
-            # for y in ys:
-                # res[y] += 1
-        # for i in range(self.N_LABEL):
-            # if res[i] > 0.0:
-                # res[i] = 1.0 / ( res[i] )
-            # else:
-                # res[i] = 1e9
         res = torch.ones(self.N_LABEL)
         res[self.lab2id['sil']] = 0.3
         if USE_CUDA:
@@ -74,35 +65,38 @@ class TIMIT():
         if type == "tr":
             # xss: [[[feat * 39] * seq len] * BATCH]
             # yss: [[label * seqlen] * BATCH]
+            sz = len(self.tr_set[i: i+batch_size])
+
             xss = [copy.deepcopy(p[1]) for p in self.tr_set[i: i+batch_size]]
-            xss += [[[0 for _ in range(self.N_FEAT)]] for _ in range(batch_size - len(xss))]
+            xss += [[[0 for _ in range(self.N_FEAT)]] for _ in range(batch_size - sz)]
 
             yss = [copy.deepcopy(p[0]) for p in self.tr_set[i: i+batch_size]]
-            yss += [[0] for _ in range(batch_size - len(yss))]
+            yss += [[0] for _ in range(batch_size - sz)]
 
-            sz = len(self.tr_set[i: i+batch_size])
             return xss, yss, sz
         elif type == "va":
             # xss: [[[feat * 39] * seq len] * BATCH]
             # yss: [[label * seqlen] * BATCH]
+            sz = len(self.valid_set[i: i+batch_size])
+
             xss = [copy.deepcopy(p[1]) for p in self.valid_set[i: i+batch_size]]
-            xss += [[[0 for _ in range(self.N_FEAT)]] for _ in range(batch_size - len(xss))]
+            xss += [[[0 for _ in range(self.N_FEAT)]] for _ in range(batch_size - sz)]
 
             yss = [copy.deepcopy(p[0]) for p in self.valid_set[i: i+batch_size]]
-            yss += [[0] for _ in range(batch_size - len(yss))]
+            yss += [[0] for _ in range(batch_size - sz)]
 
-            sz = len(self.valid_set[i: i+batch_size])
             return xss, yss, sz
         elif type == "te":
             # xss: [[[feat * 39] * seq len] * BATCH]
             # yss: ["id" * BATCH]
+            sz = len(self.te_set[i: i+batch_size])
+
             xss = [copy.deepcopy(p[0]) for p in self.te_set[i: i+batch_size]]
-            xss += [[[0 for _ in range(self.N_FEAT)]] for _ in range(batch_size - len(xss))]
+            xss += [[[0 for _ in range(self.N_FEAT)]] for _ in range(batch_size - sz)]
 
             ids = [copy.deepcopy(p[1]) for p in self.te_set[i: i+batch_size]]
-            ids += ["" for _ in range(batch_size - len(ids))]
+            ids += ["" for _ in range(batch_size - sz)]
 
-            sz = len(self.te_set[i: i+batch_size])
             return xss, ids, sz
 
     def get_frame(self, i, j, frame_size, type="tr"):
