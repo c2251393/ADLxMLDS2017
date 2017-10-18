@@ -4,6 +4,7 @@ from util import *
 from torch.nn.utils.rnn import pack_padded_sequence, pad_packed_sequence
 import os
 import copy
+import numpy as np
 
 class TIMIT():
     def __init__(self, data_folder, type="tr", feat="mfcc"):
@@ -11,7 +12,6 @@ class TIMIT():
         self.N_FEAT = 39
         if feat == "fbank":
             self.N_FEAT = 69
-        # self.N_LABEL = 48 + 1
         self.N_LABEL = 39 + 1
         self.data = data_folder
 
@@ -25,31 +25,24 @@ class TIMIT():
             train_f = os.path.join(self.data, feat, "train.ark")
             train_lab_f = os.path.join(self.data, "label", "train.lab")
 
-            # [(targets, inputs)]
+            # [(targets, inputs, id)]
             pairs = read_data(train_f, train_lab_f, self.lab2id)
+            self.max_len = max(map(lambda p: len(p[0]), pairs))
 
             random.shuffle(pairs)
+
             self.tr_set = pairs[100:]
-            self.tr_idx_set = []
-            for i in range(len(self.tr_set)):
-                ys, _, _ = self.tr_set[i]
-                self.tr_idx_set.extend((i, j) for j in range(len(ys)))
 
             self.valid_set = pairs[:100]
-            self.valid_idx_set = []
-            for i in range(len(self.valid_set)):
-                ys, _, _ = self.valid_set[i]
-                self.valid_idx_set.extend((i, j) for j in range(len(ys)))
 
             print("# of training %d" % (len(self.tr_set)))
             print("# of validation %d" % (len(self.valid_set)))
         elif type == "te":
             test_f = os.path.join(self.data, feat, "test.ark")
+
+            # [(inputs, id)]
             self.te_set = read_data(test_f, None, self.lab2id)
-            self.te_idx_set = []
-            for i in range(len(self.te_set)):
-                xs, _ = self.te_set[i]
-                self.te_idx_set.extend((i, j) for j in range(len(xs)))
+            self.max_len = max(map(lambda p: len(p[0]), self.te_set))
 
             print("# of testing %d" % (len(self.te_set)))
 
@@ -67,83 +60,40 @@ class TIMIT():
             # yss: [[label * seqlen] * BATCH]
             sz = len(self.tr_set[i: i+batch_size])
 
-            xss = [copy.deepcopy(p[1]) for p in self.tr_set[i: i+batch_size]]
-            xss += [[[0 for _ in range(self.N_FEAT)]] for _ in range(batch_size - sz)]
+            xss = [xs.copy() for (ys, xs, id) in self.tr_set[i: i + batch_size]]
+            xss += [np.zeros((1, self.N_FEAT)) for _ in range(batch_size - sz)]
 
-            yss = [copy.deepcopy(p[0]) for p in self.tr_set[i: i+batch_size]]
-            yss += [[0] for _ in range(batch_size - sz)]
+            yss = [ys.copy() for (ys, xs, id) in self.tr_set[i: i + batch_size]]
+            yss += [np.zeros(1) for _ in range(batch_size - sz)]
 
-            return xss, yss, sz
+            ids = [id for (ys, xs, id) in self.tr_set[i: i + batch_size]]
+            ids += ["" for _ in range(batch_size - sz)]
+
+            return xss, yss, ids, sz
         elif type == "va":
             # xss: [[[feat * 39] * seq len] * BATCH]
             # yss: [[label * seqlen] * BATCH]
             sz = len(self.valid_set[i: i+batch_size])
 
-            xss = [copy.deepcopy(p[1]) for p in self.valid_set[i: i+batch_size]]
-            xss += [[[0 for _ in range(self.N_FEAT)]] for _ in range(batch_size - sz)]
+            xss = [xs.copy() for (ys, xs, id) in self.valid_set[i: i + batch_size]]
+            xss += [np.zeros((1, self.N_FEAT)) for _ in range(batch_size - sz)]
 
-            yss = [copy.deepcopy(p[0]) for p in self.valid_set[i: i+batch_size]]
-            yss += [[0] for _ in range(batch_size - sz)]
+            yss = [ys.copy() for (ys, xs, id) in self.valid_set[i: i + batch_size]]
+            yss += [np.zeros(1) for _ in range(batch_size - sz)]
 
-            return xss, yss, sz
+            ids = [id for (ys, xs, id) in self.valid_set[i: i + batch_size]]
+            ids += ["" for _ in range(batch_size - sz)]
+
+            return xss, yss, ids, sz
         elif type == "te":
             # xss: [[[feat * 39] * seq len] * BATCH]
             # yss: ["id" * BATCH]
             sz = len(self.te_set[i: i+batch_size])
 
-            xss = [copy.deepcopy(p[0]) for p in self.te_set[i: i+batch_size]]
-            xss += [[[0 for _ in range(self.N_FEAT)]] for _ in range(batch_size - sz)]
+            xss = [xs.copy() for (xs, id) in self.te_set[i: i + batch_size]]
+            xss += [np.zeros((1, self.N_FEAT)) for _ in range(batch_size - sz)]
 
-            ids = [copy.deepcopy(p[1]) for p in self.te_set[i: i+batch_size]]
+            ids = [id for (xs, id) in self.te_set[i: i + batch_size]]
             ids += ["" for _ in range(batch_size - sz)]
 
-            return xss, ids, sz
-
-    def get_frame(self, i, j, frame_size, type="tr"):
-        sz = frame_size // 2
-        res = []
-        if type == "tr":
-            res = get_pad(self.tr_set[i][1], j, sz, sz, [0 for _ in range(self.N_FEAT)])
-        elif type == "va":
-            res = get_pad(self.valid_set[i][1], j, sz, sz, [0 for _ in range(self.N_FEAT)])
-        elif type == "te":
-            res = get_pad(self.te_set[i][0], j, sz, sz, [0 for _ in range(self.N_FEAT)])
-        return res
-
-    def get_flat_batch(self, i, batch_size, frame_size, type="tr"):
-        if type == "tr":
-            xss = [self.get_frame(p[0], p[1], frame_size, type) for p in self.tr_idx_set[i: i+batch_size]]
-            xss += [
-                [[0 for _ in range(self.N_FEAT)] for _ in range(frame_size)]
-                for _ in range(batch_size-len(xss))
-            ]
-
-            yss = [self.tr_set[p[0]][0][p[1]] for p in self.tr_idx_set[i: i+batch_size]]
-            yss += [0 for _ in range(batch_size - len(yss))]
-
-            sz = len(self.tr_idx_set[i: i + batch_size])
-            return xss, yss, sz
-        elif type == "va":
-            xss = [self.get_frame(p[0], p[1], frame_size, type) for p in self.valid_idx_set[i: i+batch_size]]
-            xss += [
-                [[0 for _ in range(self.N_FEAT)] for _ in range(frame_size)]
-                for _ in range(batch_size-len(xss))
-            ]
-
-            yss = [self.valid_set[p[0]][0][p[1]] for p in self.valid_idx_set[i: i+batch_size]]
-            yss += [0 for _ in range(batch_size - len(yss))]
-
-            sz = len(self.valid_idx_set[i: i + batch_size])
-            return xss, yss, sz
-        elif type == "te":
-            xss = [self.get_frame(p[0], p[1], frame_size, type) for p in self.te_idx_set[i: i+batch_size]]
-            xss += [
-                [[0 for _ in range(self.N_FEAT)] for _ in range(frame_size)]
-                for _ in range(batch_size-len(xss))
-            ]
-
-            ids = [(self.te_set[p[0]][1], p[1]) for p in self.te_idx_set[i: i+batch_size]]
-            ids += [("", -1) for _ in range(batch_size - len(ids))]
-
-            sz = len(self.te_idx_set[i: i + batch_size])
             return xss, ids, sz

@@ -4,6 +4,7 @@ from torch.autograd import Variable
 from torch.nn.utils.rnn import pack_padded_sequence, pad_packed_sequence
 import copy
 import numpy as np
+from scipy import stats
 
 USE_CUDA = torch.cuda.is_available()
 
@@ -56,25 +57,29 @@ def pad_label(seq, max_len):
     return seq
 
 
-def make_batch(xss, yss, N_FEAT):
+def make_batch(xss, yss, ids, N_FEAT):
     # xss: batch_size x len x n_feat
     # yss: batch_size x len
-    seq_pairs = sorted(zip(xss, yss), key=lambda p:len(p[0]), reverse=True)
-    xss, yss = zip(*seq_pairs)
+    seq_pairs = sorted(zip(xss, yss, ids), key=lambda p:len(p[1]), reverse=True)
+    xss, yss, ids = zip(*seq_pairs)
 
     lens = [len(xs) for xs in xss]
     max_len = max(lens)
-    xss_pad = [pad_feat(xs, max_len, N_FEAT) for xs in xss]
-    yss_pad = [pad_label(ys, max_len) for ys in yss]
+    xss_pad = [np.pad(xs, ((0, max_len - len(xs)), (0, 0)), 'constant', constant_values=0) for xs in xss]
+    xss_pad = np.array(xss_pad)
+    yss_pad = [np.pad(ys, (0, max_len - len(ys)), 'constant', constant_values=0) for ys in yss]
+    yss_pad = np.array(yss_pad)
 
     # (batch_size x maxlen)
-    xss_var = Variable(torch.FloatTensor(xss_pad))
-    yss_var = Variable(torch.LongTensor(yss_pad))
+    xss_var = Variable(torch.from_numpy(xss_pad))
+    xss_var = xss_var.type(torch.FloatTensor)
+    yss_var = Variable(torch.from_numpy(yss_pad))
+    yss_var = yss_var.type(torch.LongTensor)
 
     if USE_CUDA:
         xss_var, yss_var = xss_var.cuda(), yss_var.cuda()
 
-    return xss_var, yss_var, lens
+    return xss_var, yss_var, ids, lens
 
 
 def make_batch_te(xss, ids, N_FEAT):
@@ -85,10 +90,12 @@ def make_batch_te(xss, ids, N_FEAT):
 
     lens = [len(xs) for xs in xss]
     max_len = max(lens)
-    xss_pad = [pad_feat(xs, max_len, N_FEAT) for xs in xss]
+    xss_pad = [np.pad(xs, ((0, max_len - len(xs)), (0, 0)), 'constant', constant_values=0) for xs in xss]
+    xss_pad = np.array(xss_pad)
 
     # (batch_size x maxlen)
-    xss_var = Variable(torch.FloatTensor(xss_pad))
+    xss_var = Variable(torch.from_numpy(xss_pad))
+    xss_var = xss_var.type(torch.FloatTensor)
 
     if USE_CUDA:
         xss_var = xss_var.cuda()
@@ -116,28 +123,20 @@ def read_data(f, lab_f, lab2id):
             spid, seid, fid = frame_id.split('_')
             id = spid + '_' + seid
 
-            feat = list(map(float, words[1:]))
-
-            mean = sum(feat) / len(feat)
-            for i in range(len(feat)):
-                feat[i] -= mean
-
-            norm = math.sqrt(sum(x*x for x in feat))
-            for i in range(len(feat)):
-                feat[i] /= norm
+            # feat = list(map(float, words[1:]))
+            feat = np.array(list(map(float, words[1:])))
+            feat = stats.zscore(feat)
 
             if id not in X:
                 X[id] = []
             X[id].append(feat)
 
-            if cnt % 10000 == 0:
-                print(frame_id, id, feat)
             cnt += 1
 
     if lab_f == None:
         res = []
         for k in X.keys():
-            res.append((X[k], k))
+            res.append((np.array(X[k]), k))
         return res
 
     with open(lab_f, 'r') as f:
@@ -155,8 +154,7 @@ def read_data(f, lab_f, lab2id):
 
     res = []
     for k in X.keys():
-        print(k, len(y[k]))
-        res.append((y[k], X[k], k))
+        res.append((np.array(y[k]), np.array(X[k]), k))
 
     return res
 

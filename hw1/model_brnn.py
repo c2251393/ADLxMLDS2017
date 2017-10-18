@@ -30,7 +30,6 @@ class BRNN(nn.Module):
                             bidirectional=True)
         self.decoderlr = nn.Linear(hidden_size, output_size)
         self.decoderrl = nn.Linear(hidden_size, output_size)
-        # self.softmax = nn.Softmax()
 
     def forward(self, input, hc, lens):
         # input: (batch x maxlen x feat)
@@ -38,18 +37,11 @@ class BRNN(nn.Module):
         output_p, hc = self.lstm(input_p, hc)
         output, _ = pad_packed_sequence(output_p, batch_first=True)
 
-        output.contiguous()
+        outputlr = self.decoderlr(output[:,:,:self.hidden_size])
 
-        output = output.view(-1, self.hidden_size * 2)
-
-        outputlr = self.decoderlr(output[:,:self.hidden_size])
-
-        outputrl = self.decoderrl(output[:,self.hidden_size:])
+        outputrl = self.decoderrl(output[:,:,self.hidden_size:])
 
         output = outputlr + outputrl
-        # output = self.softmax(output)
-
-        output = output.view(self.batch_size, -1, self.output_size)
 
         return output, hc
 
