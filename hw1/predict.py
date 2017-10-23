@@ -10,7 +10,8 @@ import random
 import model_rnn
 import model_cnn
 import model_brnn
-import model_dnn
+import model_bcnn
+import model_res
 
 parser = argparse.ArgumentParser(description='')
 parser.add_argument('data', default='./data/',
@@ -18,7 +19,7 @@ parser.add_argument('data', default='./data/',
 parser.add_argument('feat', default='mfcc',
                     help='mfcc or fbank')
 parser.add_argument('model', default='rnn',
-                    help='model (rnn or cnn or brnn or dnn)')
+                    help='model (rnn or cnn or brnn or bcnn or res)')
 parser.add_argument('model_file', default='rnn.pt',
                     help='model file')
 parser.add_argument('-wx', '--window_size_x', type=int, default=int(3))
@@ -44,12 +45,14 @@ timit = TIMIT(args.data, "te", args.feat)
 
 if args.model == "rnn":
     model = model_rnn.RNN(timit.N_FEAT, HIDDEN_SIZE, timit.N_LABEL, BATCH_SIZE, N_LAYERS, DROPOUT)
-elif args.model == "cnn":
-    model = model_cnn.CNN(timit.N_FEAT, WINDOW_SIZE, POOL_SIZE, HIDDEN_SIZE, timit.N_LABEL, BATCH_SIZE, N_LAYERS, DROPOUT)
 elif args.model == "brnn":
     model = model_brnn.BRNN(timit.N_FEAT, HIDDEN_SIZE, timit.N_LABEL, BATCH_SIZE, N_LAYERS, DROPOUT)
-elif args.model == "dnn":
-    model = model_dnn.DNN(timit.N_FEAT, HIDDEN_SIZE, timit.N_LABEL, BATCH_SIZE, N_LAYERS, DROPOUT)
+elif args.model == "cnn":
+    model = model_cnn.CNN(timit.N_FEAT, WINDOW_SIZE, POOL_SIZE, HIDDEN_SIZE, timit.N_LABEL, BATCH_SIZE, N_LAYERS, DROPOUT)
+elif args.model == "bcnn":
+    model = model_bcnn.BCNN(timit.N_FEAT, WINDOW_SIZE, POOL_SIZE, HIDDEN_SIZE, timit.N_LABEL, BATCH_SIZE, N_LAYERS, DROPOUT)
+elif args.model == "res":
+    model = model_res.RESR(timit.N_FEAT, timit.N_LABEL, BATCH_SIZE, DROPOUT)
 
 state_dict = torch.load(os.path.join("models", args.model_file), map_location=lambda storage, location: storage)
 model.load_state_dict(state_dict)
@@ -81,10 +84,17 @@ f.write("id,phone_sequence\n")
 def trim(ys):
     res = []
     pre = -1
+    cnt = 0
     for y in ys:
         if pre != y:
-            res.append(y)
-        pre = y
+            if cnt > 2:
+                res.append(pre)
+            pre = y
+            cnt = 1
+        else:
+            cnt += 1
+    if cnt > 2:
+        res.append(pre)
     if len(res) == 1:
         return res
     if res[0] == timit.id2ascii[timit.lab2id['sil']]:
