@@ -10,7 +10,8 @@ import numpy as np
 import model_rnn
 import model_cnn
 import model_brnn
-import model_dnn
+import model_bcnn
+import model_res
 
 parser = argparse.ArgumentParser(description='')
 parser.add_argument('data', default='./data/',
@@ -18,7 +19,7 @@ parser.add_argument('data', default='./data/',
 parser.add_argument('feat', default='mfcc',
                     help='mfcc or fbank')
 parser.add_argument('model', default='rnn',
-                    help='model (rnn or cnn or brnn or dnn)')
+                    help='model (rnn or cnn or brnn or bcnn or res)')
 parser.add_argument('-l', '--lr', type=float, default=float(0.1))
 parser.add_argument('-e', '--n_epoch', type=int, default=int(3))
 parser.add_argument('-wx', '--window_size_x', type=int, default=int(3))
@@ -50,12 +51,14 @@ timit = TIMIT(args.data, "tr", args.feat)
 
 if args.model == "rnn":
     model = model_rnn.RNN(timit.N_FEAT, HIDDEN_SIZE, timit.N_LABEL, BATCH_SIZE, N_LAYERS, DROPOUT)
-elif args.model == "cnn":
-    model = model_cnn.CNN(timit.N_FEAT, WINDOW_SIZE, POOL_SIZE, HIDDEN_SIZE, timit.N_LABEL, BATCH_SIZE, N_LAYERS, DROPOUT)
 elif args.model == "brnn":
     model = model_brnn.BRNN(timit.N_FEAT, HIDDEN_SIZE, timit.N_LABEL, BATCH_SIZE, N_LAYERS, DROPOUT)
-elif args.model == "dnn":
-    model = model_dnn.DNN(timit.N_FEAT, HIDDEN_SIZE, timit.N_LABEL, BATCH_SIZE, N_LAYERS, DROPOUT)
+elif args.model == "cnn":
+    model = model_cnn.CNN(timit.N_FEAT, WINDOW_SIZE, POOL_SIZE, HIDDEN_SIZE, timit.N_LABEL, BATCH_SIZE, N_LAYERS, DROPOUT)
+elif args.model == "bcnn":
+    model = model_bcnn.BCNN(timit.N_FEAT, WINDOW_SIZE, POOL_SIZE, HIDDEN_SIZE, timit.N_LABEL, BATCH_SIZE, N_LAYERS, DROPOUT)
+elif args.model == "res":
+    model = model_res.RESR(timit.N_FEAT, timit.N_LABEL, BATCH_SIZE, DROPOUT)
 
 if USE_CUDA:
     model.cuda()
@@ -80,12 +83,12 @@ def batch_eval(inp, target, ids, useful, lens):
         ta_y = target[i].data[:lens[i]]
         acc += sum(ta_y == my_y)
 
-        if i == 0:
-            print(ids[i])
-            print(list(my_y[:40]))
-            print(list(my_y[-40:]))
-            print(list(ta_y[:40]))
-            print(list(ta_y[-40:]))
+#        if i == 0:
+#            print(ids[i])
+#            print(list(my_y[:40]))
+#            print(list(my_y[-40:]))
+#            print(list(ta_y[:40]))
+#            print(list(ta_y[-40:]))
 
     return loss, acc
 
@@ -145,11 +148,11 @@ for epoch in range(1, N_EPOCH + 1):
         loss_tot += loss
 
         if iter % print_every == 0:
-            print(ids[0])
-            print(list(output[0].data.max(1)[1][:40]))
-            print(list(output[0].data.max(1)[1][-40:]))
-            print(list(target[0].data[:40]))
-            print(list(target[0].data[-40:]))
+#            print(ids[0])
+#            print(list(output[0].data.max(1)[1][:40]))
+#            print(list(output[0].data.max(1)[1][-40:]))
+#            print(list(target[0].data[:40]))
+#            print(list(target[0].data[-40:]))
             print('[%s (%d %d%%) %.4f %.4f]' %
                   (time_since(start), iter, iter / (N_EPOCH * len(timit.tr_set)) * 100, loss, loss_tot / (i+1)))
 
