@@ -12,6 +12,7 @@ import model_cnn
 import model_brnn
 import model_bcnn
 import model_res
+import model_bres
 
 parser = argparse.ArgumentParser(description='')
 parser.add_argument('data', default='./data/',
@@ -19,7 +20,7 @@ parser.add_argument('data', default='./data/',
 parser.add_argument('feat', default='mfcc',
                     help='mfcc or fbank')
 parser.add_argument('model', default='rnn',
-                    help='model (rnn or cnn or brnn or bcnn or res)')
+                    help='model (rnn or cnn or brnn or bcnn or res or bres)')
 parser.add_argument('-l', '--lr', type=float, default=float(0.1))
 parser.add_argument('-e', '--n_epoch', type=int, default=int(3))
 parser.add_argument('-wx', '--window_size_x', type=int, default=int(3))
@@ -59,6 +60,8 @@ elif args.model == "bcnn":
     model = model_bcnn.BCNN(timit.N_FEAT, WINDOW_SIZE, POOL_SIZE, HIDDEN_SIZE, timit.N_LABEL, BATCH_SIZE, N_LAYERS, DROPOUT)
 elif args.model == "res":
     model = model_res.RESR(timit.N_FEAT, timit.N_LABEL, BATCH_SIZE, DROPOUT)
+elif args.model == "bres":
+    model = model_bres.BRESR(timit.N_FEAT, HIDDEN_SIZE, timit.N_LABEL, BATCH_SIZE, N_LAYERS, DROPOUT)
 
 if USE_CUDA:
     model.cuda()
@@ -154,7 +157,11 @@ for epoch in range(1, N_EPOCH + 1):
 #            print(list(target[0].data[:40]))
 #            print(list(target[0].data[-40:]))
             print('[%s (%d %d%%) %.4f %.4f]' %
-                  (time_since(start), iter, iter / (N_EPOCH * len(timit.tr_set)) * 100, loss, loss_tot / (i+1)))
+                  (time_since(start),
+                   iter,
+                   iter / (N_EPOCH * len(timit.tr_set)) * 100,
+                   loss,
+                   loss_tot / (i//BATCH_SIZE+1)))
 
         iter += 1
 

@@ -55,11 +55,7 @@ class CNN(nn.Module):
         output_p, hc = self.lstm(input_p, hc)
         output, _ = pad_packed_sequence(output_p, batch_first=True)
 
-        output.contiguous()
-
-        output = self.decoder(output.view(-1, self.hidden_size))
-
-        output = output.view(self.batch_size, -1, self.output_size)
+        output = self.decoder(output)
 
         return output, hc
 

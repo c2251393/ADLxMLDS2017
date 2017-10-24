@@ -12,6 +12,7 @@ import model_cnn
 import model_brnn
 import model_bcnn
 import model_res
+import model_bres
 
 parser = argparse.ArgumentParser(description='')
 parser.add_argument('data', default='./data/',
@@ -19,7 +20,7 @@ parser.add_argument('data', default='./data/',
 parser.add_argument('feat', default='mfcc',
                     help='mfcc or fbank')
 parser.add_argument('model', default='rnn',
-                    help='model (rnn or cnn or brnn or bcnn or res)')
+                    help='model (rnn or cnn or brnn or bcnn or res or bres)')
 parser.add_argument('model_file', default='rnn.pt',
                     help='model file')
 parser.add_argument('-wx', '--window_size_x', type=int, default=int(3))
@@ -29,6 +30,7 @@ parser.add_argument('-H', '--hidden_size', type=int, default=int(20))
 parser.add_argument('-b', '--batch_size', type=int, default=int(32))
 parser.add_argument('-n', '--n_layers', type=int, default=int(1))
 parser.add_argument('-d', '--dropout', type=float, default=int(0.0))
+parser.add_argument('-o', '--output_file', type=str, default="output.csv")
 args = parser.parse_args()
 
 
@@ -38,6 +40,7 @@ POOL_SIZE = args.pool_size
 BATCH_SIZE = args.batch_size
 N_LAYERS = args.n_layers
 DROPOUT = args.dropout
+OUT_FN = args.output_file
 
 print(args.model, args.model_file, HIDDEN_SIZE, N_LAYERS, BATCH_SIZE, WINDOW_SIZE, DROPOUT)
 
@@ -53,6 +56,8 @@ elif args.model == "bcnn":
     model = model_bcnn.BCNN(timit.N_FEAT, WINDOW_SIZE, POOL_SIZE, HIDDEN_SIZE, timit.N_LABEL, BATCH_SIZE, N_LAYERS, DROPOUT)
 elif args.model == "res":
     model = model_res.RESR(timit.N_FEAT, timit.N_LABEL, BATCH_SIZE, DROPOUT)
+elif args.model == "bres":
+    model = model_bres.BRESR(timit.N_FEAT, HIDDEN_SIZE, timit.N_LABEL, BATCH_SIZE, N_LAYERS, DROPOUT)
 
 state_dict = torch.load(os.path.join("models", args.model_file), map_location=lambda storage, location: storage)
 model.load_state_dict(state_dict)
@@ -78,7 +83,7 @@ def batch_pre(inp, useful, lens):
 
     return res
 
-f = open("submissions/submit_%s.csv" % args.model_file, "w")
+f = open(OUT_FN, "w")
 f.write("id,phone_sequence\n")
 
 def trim(ys):
