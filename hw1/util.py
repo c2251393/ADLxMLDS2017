@@ -110,28 +110,31 @@ def time_since(since):
     return '%dm %ds' % (m, s)
 
 
-def read_data(f, lab_f, lab2id):
-    print(f, lab_f)
+def read_data(fs, lab_f, lab2id):
+    print(fs, lab_f)
     X = {}
     y = {}
-    with open(f, 'r') as f:
-        cnt = 0
-        for line in f.readlines():
-            words = line[:-1].split()
-            frame_id = words[0]
 
-            spid, seid, fid = frame_id.split('_')
-            id = spid + '_' + seid
+    frames = {}
+    for f in fs:
+        with open(f, 'r') as fp:
+            for line in fp.readlines():
+                words = line[:-1].split()
+                frame_id = words[0]
+                if frame_id not in frames:
+                    frames[frame_id] = []
+                frames[frame_id].extend(map(float, words[1:]))
+    print("tot # of frames: ", len(frames))
 
-            # feat = list(map(float, words[1:]))
-            feat = np.array(list(map(float, words[1:])))
-            feat = stats.zscore(feat)
-
-            if id not in X:
-                X[id] = []
-            X[id].append(feat)
-
-            cnt += 1
+    frame_ids = sorted(list(frames.keys()), key=lambda s: int(s.split('_')[2]))
+    for frame_id in frame_ids:
+        feat = frames[frame_id]
+        spid, seid, fid = frame_id.split('_')
+        id = spid + '_' + seid
+        feat = stats.zscore(feat)
+        if id not in X:
+            X[id] = []
+        X[id].append(feat)
 
     if lab_f == None:
         res = []
