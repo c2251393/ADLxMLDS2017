@@ -1,3 +1,17 @@
 # HW1 README
 
 1. ./hw1_best.sh 不包含下載 model 在 azure nc6 上會花 4, 5 分鐘。
+
+## 怎麼 train model?
+
+### model of hw1_rnn.sh
+
+$ python3 train.py data/ mfcc brnn -b 100 -H 100 -n 6 -d 0.5 -l 0.0001 -e 400
+
+### model of hw1_cnn.sh
+
+$ python3 train.py data/ mfcc cnn -b 100 -H 50 -n 5 -l 0.0001 -e 500
+
+### model of hw1_best.sh
+
+$ python3 train.py data/ all brnn -b 4 -H 1024 -n 6 -d 0.5 -l 0.0001 -e 30
