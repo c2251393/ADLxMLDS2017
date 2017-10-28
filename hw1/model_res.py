@@ -46,35 +46,37 @@ class RES(nn.Module):
 class RESR(nn.Module):
     def __init__(self,
                  input_size,
+                 hidden_size,
                  output_size,
                  batch_size,
+                 n_layers,
                  dropout
                  ):
         super(RESR, self).__init__()
         self.input_size = input_size
-        self.hidden_size = 128
-        self.n_layers = 4
+        self.hidden_size = hidden_size
+        self.n_layers = n_layers
         self.output_size = output_size
         self.batch_size = batch_size
         self.dropout = dropout
 
-        self.lstm = nn.LSTM(input_size,
-                            128,
-                            4,
-                            batch_first=True,
-                            dropout=self.dropout)
+        self.rnn = nn.RNN(input_size,
+                          hidden_size,
+                          n_layers,
+                          batch_first=True,
+                          dropout=self.dropout)
 
         self.res1 = RES(1, 16, 3, 6)
         self.res2 = RES(16, 8, 3, 2)
         self.res3 = RES(8, 4, 3, 2)
         self.res4 = RES(4, 2, 3, 2)
 
-        self.W = nn.Linear(256, self.output_size)
+        self.W = nn.Linear(2 * self.hidden_size, self.output_size)
 
     def forward(self, input, hc, lens):
         # input: (batch x maxlen x feat)
         input_p = pack_padded_sequence(input, lens, batch_first=True)
-        output_p, hc = self.lstm(input_p, hc)
+        output_p, hc = self.rnn(input_p, hc)
         output, _ = pad_packed_sequence(output_p, batch_first=True)
         # output: (batch x maxlen x 128)
 
@@ -96,8 +98,9 @@ class RESR(nn.Module):
         return output, hc
 
     def init_hidden(self):
-        h0 = Variable(torch.zeros(4, self.batch_size, 128))
-        c0 = Variable(torch.zeros(4, self.batch_size, 128))
+        h0 = Variable(torch.zeros(self.n_layers, self.batch_size, self.hidden_size))
+        c0 = Variable(torch.zeros(self.n_layers, self.batch_size, self.hidden_size))
         if USE_CUDA:
             h0, c0 = h0.cuda(), c0.cuda()
+        # return h0
         return (h0, c0)
