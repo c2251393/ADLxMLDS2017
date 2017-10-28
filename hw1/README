@@ -1,0 +1,3 @@
+# HW1 README
+
+1. ./hw1_best.sh 不包含下載 model 在 azure nc6 上會花 4, 5 分鐘。
