@@ -6,6 +6,7 @@ import os
 import glob
 from util import *
 from timit import *
+from collections import Counter
 import random
 import model_rnn
 import model_cnn
@@ -55,7 +56,7 @@ elif args.model == "cnn":
 elif args.model == "bcnn":
     model = model_bcnn.BCNN(timit.N_FEAT, WINDOW_SIZE, POOL_SIZE, HIDDEN_SIZE, timit.N_LABEL, BATCH_SIZE, N_LAYERS, DROPOUT)
 elif args.model == "res":
-    model = model_res.RESR(timit.N_FEAT, timit.N_LABEL, BATCH_SIZE, DROPOUT)
+    model = model_res.RESR(timit.N_FEAT, HIDDEN_SIZE, timit.N_LABEL, BATCH_SIZE, N_LAYERS, DROPOUT)
 elif args.model == "bres":
     model = model_bres.BRESR(timit.N_FEAT, HIDDEN_SIZE, timit.N_LABEL, BATCH_SIZE, N_LAYERS, DROPOUT)
 
@@ -107,6 +108,21 @@ def trim(ys):
     if res[-1] == timit.id2ascii[timit.lab2id['sil']]:
         res = res[:-1]
     return res
+
+FRAME = 6
+def trim2(ys):
+    res = []
+    pre = -1
+    cnt = 0
+    for i in range(len(ys) - FRAME + 1):
+        frame = ys[i: i+FRAME]
+        cnter = Counter(frame)
+        y = cnter.most_common()[0][0]
+        if y != pre and y != timit.id2ascii[timit.lab2id['sil']]:
+            res.append(y)
+        pre = y
+    return res
+
 
 for i in range(0, len(timit.te_set), BATCH_SIZE):
     inputs, ids, useful = timit.get_batch(i, BATCH_SIZE, "te")

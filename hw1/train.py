@@ -18,7 +18,7 @@ parser = argparse.ArgumentParser(description='')
 parser.add_argument('data', default='./data/',
                     help='data folder')
 parser.add_argument('feat', default='mfcc',
-                    help='mfcc or fbank')
+                    help='mfcc or fbank or all')
 parser.add_argument('model', default='rnn',
                     help='model (rnn or cnn or brnn or bcnn or res or bres)')
 parser.add_argument('-l', '--lr', type=float, default=float(0.1))
@@ -30,6 +30,7 @@ parser.add_argument('-H', '--hidden_size', type=int, default=int(20))
 parser.add_argument('-b', '--batch_size', type=int, default=int(32))
 parser.add_argument('-n', '--n_layers', type=int, default=int(1))
 parser.add_argument('-d', '--dropout', type=float, default=int(0.0))
+parser.add_argument('-M', '--Model', type=str, default='')
 
 args = parser.parse_args()
 
@@ -59,12 +60,17 @@ elif args.model == "cnn":
 elif args.model == "bcnn":
     model = model_bcnn.BCNN(timit.N_FEAT, WINDOW_SIZE, POOL_SIZE, HIDDEN_SIZE, timit.N_LABEL, BATCH_SIZE, N_LAYERS, DROPOUT)
 elif args.model == "res":
-    model = model_res.RESR(timit.N_FEAT, timit.N_LABEL, BATCH_SIZE, DROPOUT)
+    model = model_res.RESR(timit.N_FEAT, HIDDEN_SIZE, timit.N_LABEL, BATCH_SIZE, N_LAYERS, DROPOUT)
 elif args.model == "bres":
     model = model_bres.BRESR(timit.N_FEAT, HIDDEN_SIZE, timit.N_LABEL, BATCH_SIZE, N_LAYERS, DROPOUT)
 
 if USE_CUDA:
     model.cuda()
+
+if args.Model != '':
+    print("warm start: ", args.Model)
+    state_dict = torch.load(os.path.join("models", args.Model), map_location=lambda storage, location: storage)
+    model.load_state_dict(state_dict)
 
 opt = torch.optim.Adam(model.parameters(), lr = LR)
 criterion = nn.CrossEntropyLoss(timit.label_wt())
