@@ -57,7 +57,7 @@ class LANG():
         return np.array(tmp), len(res)+2
 
     def itran(self, idxs):
-        res = ' '.join(id2word[idx] for idx in idxs if idx not in [0, 1, 2])
+        res = ' '.join(self.id2word[idx] for idx in idxs if idx not in [0, 1, 2])
         return res
     
     def one_hot_word(self, s):
