@@ -18,7 +18,7 @@ class S2S(nn.Module):
                  ):
         super(S2S, self).__init__()
         self.input_size = 4096
-        self.vocab_size = 6144
+        self.vocab_size = len(lang.word2id)
         self.hidden_size = 256
 
         self.lstm1 = nn.LSTM(self.input_size,
