@@ -141,6 +141,8 @@ def eval(batch):
         target_lengths = target_lengths.cuda()
 
     decoder_outs, symbol_outs = model(X, None, Variable(torch.LongTensor([MAXLEN])))
+    
+    loss = 0
 
     for i in range(batch_size):
         for j in range(MAX_N_CAP):
@@ -158,7 +160,8 @@ def main():
     for epoch in range(1, args.n_epoch+1):
         for (i, bat) in enumerate(tr_loader, 1):
             loss = train(bat)
-            print("%s %d/%d %.4f" % (time_since(start), i, len(tr_loader), loss))
+            if i % 10 == 0:
+                print("%s %d/%d %.4f" % (time_since(start), i, len(tr_loader), loss))
 
         for (i, bat) in enumerate(te_loader, 1):
             loss, symbol_outs = eval(bat)
