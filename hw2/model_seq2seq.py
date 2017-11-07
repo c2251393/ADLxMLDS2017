@@ -20,7 +20,7 @@ parser.add_argument('-e', '--n_epoch', type=int, default=int(200))
 parser.add_argument('-wx', '--window_size_x', type=int, default=int(3))
 parser.add_argument('-wy', '--window_size_y', type=int, default=int(2))
 parser.add_argument('-p', '--pool_size', type=int, default=int(2))
-parser.add_argument('-H', '--hidden_size', type=int, default=int(20))
+parser.add_argument('-H', '--hidden_size', type=int, default=int(256))
 parser.add_argument('-b', '--batch_size', type=int, default=int(16))
 parser.add_argument('-n', '--n_layers', type=int, default=int(1))
 parser.add_argument('-d', '--dropout', type=float, default=int(0.0))
@@ -73,7 +73,7 @@ class MSVD_te(Dataset):
                 caps.append(np.array([PAD_TOKEN] * MAXLEN))
                 lens.append(0)
             x['cap_lens'] = lens
-        
+
     def __len__(self):
         return len(self.data)
 
@@ -96,6 +96,7 @@ criterion = nn.CrossEntropyLoss()
 
 
 def train(batch):
+    model.train()
     opt.zero_grad()
     loss = 0
 
@@ -105,9 +106,9 @@ def train(batch):
     target_outputs = Variable(torch.stack(batch['caption'], 1))
     target_lengths = Variable(torch.stack(batch['cap_lens'], 1))
     if USE_CUDA:
-        X.cuda()
-        target_outputs.cuda()
-        target_lengths.cuda()
+        X = X.cuda()
+        target_outputs = target_outputs.cuda()
+        target_lengths = target_lengths.cuda()
 
     decoder_outs, symbol_outs = model(X, target_outputs, target_lengths)
 
@@ -126,9 +127,53 @@ def train(batch):
     return loss.data[0]
 
 
-start = time.time()
+def eval(batch):
+    model.eval()
 
-for epoch in range(1, args.n_epoch+1):
-    for (i, bat) in enumerate(tr_loader, 1):
-        loss = train(bat)
-        print("%s %d/%d %.4f" % (time_since(start), i, len(tr_loader), loss))
+    batch_size = len(batch['id'])
+
+    X = Variable(batch['feat'])
+    target_outputs = Variable(torch.stack(batch['caption'], 1))
+    target_lengths = Variable(torch.stack(batch['cap_lens'], 1))
+    if USE_CUDA:
+        X = X.cuda()
+        target_outputs = target_outputs.cuda()
+        target_lengths = target_lengths.cuda()
+
+    decoder_outs, symbol_outs = model(X, None, Variable(torch.LongTensor([MAXLEN])))
+
+    for i in range(batch_size):
+        for j in range(MAX_N_CAP):
+            tlen = target_lengths[i][j].data[0]
+            if tlen == 0:
+                break
+            loss += criterion(decoder_outs[i][:tlen], target_outputs[i][j][:tlen])
+
+    return loss.data[0], symbol_outs
+
+test_ans = {}
+
+def main():
+    start = time.time()
+    for epoch in range(1, args.n_epoch+1):
+        for (i, bat) in enumerate(tr_loader, 1):
+            loss = train(bat)
+            print("%s %d/%d %.4f" % (time_since(start), i, len(tr_loader), loss))
+
+        for (i, bat) in enumerate(te_loader, 1):
+            loss, symbol_outs = eval(bat)
+            for (j, id) in enumerate(bat['id']):
+                test_ans[id] = lang.itran(symbol_outs[j])
+
+            print("%s %d/%d %.4f" % (time_since(start), i, len(te_loader), loss))
+
+        model_name = "s2vt.h%d.b%d.e%d.pt" % (args.hidden_size, args.batch_size, epoch)
+
+        if epoch % 30 == 0:
+            fp = open(model_name + ".ans", 'w')
+            for (k, v) in test_ans:
+                fp.write("%s,%s\n" % (k, v))
+            fp.close()
+            torch.save(model.state_dict(), os.path.join("models", model_name))
+
+# main()

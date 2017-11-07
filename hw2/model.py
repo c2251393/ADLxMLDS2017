@@ -44,6 +44,7 @@ class S2S(nn.Module):
         # hc:     (batch x 1 x feat)^2
 
         max_lens = torch.max(target_lengths).data[0]
+        print("max len: ", max_lens)
 
         symbol_outs = []
         decoder_outs = []
@@ -61,7 +62,7 @@ class S2S(nn.Module):
 
         symbol = Variable(torch.LongTensor([SOS_TOKEN for _ in range(batch_size)]))
         if USE_CUDA:
-            symbol.cuda()
+            symbol = symbol.cuda()
         dec_o = self.W(self.embed(symbol))
 
         for i in range(max_lens):
@@ -78,7 +79,7 @@ class S2S(nn.Module):
         h0 = Variable(torch.zeros(1, batch_size, self.hidden_size))
         c0 = Variable(torch.zeros(1, batch_size, self.hidden_size))
         if USE_CUDA:
-            h0.cuda()
-            c0.cuda()
+            h0 = h0.cuda()
+            c0 = c0.cuda()
         return (h0, c0)
 

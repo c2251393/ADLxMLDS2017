@@ -55,6 +55,10 @@ class LANG():
             print("FUCK")
         tmp = [SOS_TOKEN] + res + [EOS_TOKEN] + [PAD_TOKEN] * (to_len - 2 - len(res))
         return np.array(tmp), len(res)+2
+
+    def itran(self, idxs):
+        res = ' '.join(id2word[idx] for idx in idxs if idx not in [0, 1, 2])
+        return res
     
     def one_hot_word(self, s):
         return one_hot(self.index_word(s))
@@ -65,7 +69,6 @@ class LANG():
         return np.array(res)
 
 lang = LANG()
-
 
 
 def time_since(since):
