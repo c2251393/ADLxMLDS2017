@@ -62,8 +62,11 @@ class LANG():
             if idx in [EOS_TOKEN, PAD_TOKEN]:
                 break
             if idx != SOS_TOKEN:
-                tokens.append(self.id2word[idx])
+                word = self.id2word[idx]
+                if len(tokens) == 0 or word != tokens[-1]:
+                    tokens.append(word)
         res = ' '.join(tokens)
+        res = res[0].upper() + res[1:] + '.'
         return res
     
     def one_hot_word(self, s):
