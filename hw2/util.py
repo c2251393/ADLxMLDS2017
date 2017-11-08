@@ -57,7 +57,13 @@ class LANG():
         return np.array(tmp), len(res)+2
 
     def itran(self, idxs):
-        res = ' '.join(self.id2word[idx] for idx in idxs if idx not in [0, 1, 2])
+        tokens = []
+        for idx in idxs:
+            if idx in [EOS_TOKEN, PAD_TOKEN]:
+                break
+            if idx != SOS_TOKEN:
+                tokens.append(self.id2word[idx])
+        res = ' '.join(tokens)
         return res
     
     def one_hot_word(self, s):
