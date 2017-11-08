@@ -4,6 +4,7 @@ from torch.autograd import Variable
 import torch.nn.functional as F
 from torch.nn.utils.rnn import pack_padded_sequence, pad_packed_sequence
 from util import *
+import random
 
 class Encoder(nn.Module):
     def __init__(self,
@@ -60,7 +61,7 @@ class Decoder(nn.Module):
         self.W = nn.Linear(self.hidden_size, self.vocab_size)
         self.hc = None
 
-    def forward(self, output, hc, target_outputs, target_lengths):
+    def forward(self, output, hc, target_outputs, target_lengths, sched_sampling_p=1):
         batch_size = output.size()[0]
         max_lens = torch.max(target_lengths).data[0]
         self.hc = hc
@@ -87,6 +88,8 @@ class Decoder(nn.Module):
         for i in range(max_lens):
             symbol_outs.append(symbol)
             decoder_outs.append(dec_o)
+            if target_outputs is not None and random.random() < sched_sampling_p:
+                symbol = target_outputs[:,i]
             dec_o, symbol = decode(symbol)
 
         decoder_outs = torch.stack(decoder_outs, 1)
@@ -109,10 +112,10 @@ class S2S(nn.Module):
         self.encoder = Encoder(self.hidden_size, self.dropout)
         self.decoder = Decoder(self.hidden_size, self.dropout)
 
-    def forward(self, input, target_outputs, target_lengths):
+    def forward(self, input, target_outputs, target_lengths, sched_sampling_p):
 
         output, hc = self.encoder(input)
 
-        decoder_outs, symbol_outs = self.decoder(output, hc, target_outputs, target_lengths)
+        decoder_outs, symbol_outs = self.decoder(output, hc, target_outputs, target_lengths, sched_sampling_p)
 
         return decoder_outs, symbol_outs

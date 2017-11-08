@@ -8,6 +8,7 @@ import os
 import json
 import glob
 import random
+import math
 import numpy as np
 from util import *
 import model
@@ -38,6 +39,7 @@ class MSVD_tr(Dataset):
             cap["feat"] = np.load(fn).astype('float32')
 
         for x in self.data:
+            random.shuffle(x['caption'])
             caps = x['caption']
             lens = []
             for i in range(len(caps)):
@@ -47,6 +49,9 @@ class MSVD_tr(Dataset):
                 caps.append(np.array([PAD_TOKEN] * MAXLEN))
                 lens.append(0)
             x['cap_lens'] = lens
+
+            x['caption'] = x['caption'][0]
+            x['cap_lens'] = x['cap_lens'][0]
 
     def __len__(self):
         return len(self.data)
@@ -64,6 +69,7 @@ class MSVD_te(Dataset):
             cap["feat"] = np.load(fn).astype('float32')
 
         for x in self.data:
+            random.shuffle(x['caption'])
             caps = x['caption']
             lens = []
             for i in range(len(caps)):
@@ -73,6 +79,9 @@ class MSVD_te(Dataset):
                 caps.append(np.array([PAD_TOKEN] * MAXLEN))
                 lens.append(0)
             x['cap_lens'] = lens
+
+            x['caption'] = x['caption'][0]
+            x['cap_lens'] = x['cap_lens'][0]
 
     def __len__(self):
         return len(self.data)
@@ -95,7 +104,7 @@ opt = torch.optim.Adam(model.parameters(), lr = args.lr)
 criterion = nn.CrossEntropyLoss()
 
 
-def train(batch):
+def train(batch, sched_sampling_p=1):
     model.train()
     opt.zero_grad()
     loss = 0
@@ -103,21 +112,18 @@ def train(batch):
     batch_size = len(batch['id'])
 
     X = Variable(batch['feat'])
-    target_outputs = Variable(torch.stack(batch['caption'], 1))
-    target_lengths = Variable(torch.stack(batch['cap_lens'], 1))
+    target_outputs = Variable(torch.stack(batch['caption']))
+    target_lengths = Variable(batch['cap_lens'])
     if USE_CUDA:
         X = X.cuda()
         target_outputs = target_outputs.cuda()
         target_lengths = target_lengths.cuda()
 
-    decoder_outs, symbol_outs = model(X, target_outputs, target_lengths)
+    decoder_outs, symbol_outs = model(X, target_outputs, target_lengths, sched_sampling_p)
 
     for i in range(batch_size):
-        for j in range(MAX_N_CAP):
-            tlen = target_lengths[i][j].data[0]
-            if tlen == 0:
-                break
-            loss += criterion(decoder_outs[i][:tlen], target_outputs[i][j][:tlen])
+        tlen = target_lengths[i].data[0]
+        loss += criterion(decoder_outs[i][:tlen], target_outputs[i][:tlen])
 
     if USE_CUDA:
         loss.cuda()
@@ -133,23 +139,20 @@ def eval(batch):
     batch_size = len(batch['id'])
 
     X = Variable(batch['feat'])
-    target_outputs = Variable(torch.stack(batch['caption'], 1))
-    target_lengths = Variable(torch.stack(batch['cap_lens'], 1))
+    target_outputs = Variable(torch.stack(batch['caption']))
+    target_lengths = Variable(batch['cap_lens'])
     if USE_CUDA:
         X = X.cuda()
         target_outputs = target_outputs.cuda()
         target_lengths = target_lengths.cuda()
 
     decoder_outs, symbol_outs = model(X, None, Variable(torch.LongTensor([MAXLEN])))
-    
+
     loss = 0
 
     for i in range(batch_size):
-        for j in range(MAX_N_CAP):
-            tlen = target_lengths[i][j].data[0]
-            if tlen == 0:
-                break
-            loss += criterion(decoder_outs[i][:tlen], target_outputs[i][j][:tlen])
+        tlen = target_lengths[i].data[0]
+        loss += criterion(decoder_outs[i][:tlen], target_outputs[i][:tlen])
 
     return loss.data[0], symbol_outs
 
@@ -157,12 +160,16 @@ test_ans = {}
 
 def main():
     start = time.time()
+    iter = 1
     for epoch in range(1, args.n_epoch+1):
         print("================= EPOCH %d ======================" % epoch)
         for (i, bat) in enumerate(tr_loader, 1):
-            loss = train(bat)
+            k = 1
+            prob = k / (k + math.exp(iter / k))
+            loss = train(bat, prob)
             if i % 1 == 0:
                 print("%s %d/%d %.4f" % (time_since(start), i, len(tr_loader), loss))
+            iter += 1
 
         for (i, bat) in enumerate(te_loader, 1):
             loss, symbol_outs = eval(bat)
