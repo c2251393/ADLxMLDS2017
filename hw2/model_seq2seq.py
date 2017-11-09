@@ -26,6 +26,7 @@ parser.add_argument('-b', '--batch_size', type=int, default=int(16))
 parser.add_argument('-n', '--n_layers', type=int, default=int(1))
 parser.add_argument('-d', '--dropout', type=float, default=int(0.0))
 parser.add_argument('-M', '--Model', type=str, default='')
+parser.add_argument('-a', '--attn', action='store_true')
 
 args = parser.parse_args()
 
@@ -96,7 +97,7 @@ tr_loader = DataLoader(tr_data, batch_size=args.batch_size, shuffle=True)
 te_data = MSVD_te(args.data)
 te_loader = DataLoader(te_data, batch_size=args.batch_size, shuffle=True)
 
-model = model.S2S(args.hidden_size, args.dropout)
+model = model.S2S(args.hidden_size, args.dropout, args.attn)
 if USE_CUDA:
     model.cuda()
 
@@ -187,4 +188,4 @@ def main():
             fp.close()
             torch.save(model.state_dict(), os.path.join("models", model_name))
 
-# main()
+main()

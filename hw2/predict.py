@@ -31,6 +31,7 @@ parser.add_argument('-b', '--batch_size', type=int, default=int(16))
 parser.add_argument('-n', '--n_layers', type=int, default=int(1))
 parser.add_argument('-d', '--dropout', type=float, default=int(0.0))
 parser.add_argument('-M', '--Model', type=str, default='')
+parser.add_argument('-a', '--attn', action='store_true')
 
 args = parser.parse_args()
 
@@ -116,7 +117,7 @@ if args.peer_o != 'nan':
     peer_loader = DataLoader(te_data, batch_size=args.batch_size, shuffle=True)
 
 
-model = model.S2S(args.hidden_size, args.dropout)
+model = model.S2S(args.hidden_size, args.dropout, args.attn)
 if USE_CUDA:
     model.cuda()
 

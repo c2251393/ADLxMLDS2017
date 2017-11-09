@@ -71,7 +71,8 @@ class Attention(nn.Module):
 class Decoder(nn.Module):
     def __init__(self,
                  hidden_size,
-                 dropout
+                 dropout,
+                 do_attn=True
                  ):
         super(Decoder, self).__init__()
         self.input_size = 4096
@@ -79,14 +80,18 @@ class Decoder(nn.Module):
         self.hidden_size = hidden_size
         self.dropout = dropout
 
-        self.attn = Attention(self.hidden_size)
+        if do_attn:
+            self.attn = Attention(self.hidden_size)
+            self.concat = nn.Linear(2*self.hidden_size, self.hidden_size)
+        else:
+            self.attn = None
+            self.concat = None
         self.rnn = nn.LSTM(self.hidden_size,
                            self.hidden_size,
                            1,
                            dropout=self.dropout,
                            batch_first=True)
         self.embed = nn.Embedding(self.vocab_size, self.hidden_size)
-        self.concat = nn.Linear(2*self.hidden_size, self.hidden_size)
         self.W = nn.Linear(self.hidden_size, self.vocab_size)
         self.hc = None
 
@@ -104,12 +109,15 @@ class Decoder(nn.Module):
             y, self.hc = self.rnn(y, self.hc)
             # y: (batch x 1 x hidden)
 
-            A = self.attn(y, output).unsqueeze(1)
-            # A: (batch x 1 x len)
-            c = A.bmm(output)
-            # c: (batch x 1 x hidden)
-            yc = F.tanh(self.concat(torch.cat((y, c), 2)))
-            # yc: (batch x 1 x hidden)
+            if self.attn is not None:
+                A = self.attn(y, output).unsqueeze(1)
+                # A: (batch x 1 x len)
+                c = A.bmm(output)
+                # c: (batch x 1 x hidden)
+                yc = F.tanh(self.concat(torch.cat((y, c), 2)))
+                # yc: (batch x 1 x hidden)
+            else:
+                yc = y
 
             dec_o = self.W(yc)
             # dec_o: (batch x 1 x vocab_size)
@@ -141,7 +149,8 @@ class Decoder(nn.Module):
 class S2S(nn.Module):
     def __init__(self,
                  hidden_size=256,
-                 dropout=0
+                 dropout=0,
+                 do_attn=True
                  ):
         super(S2S, self).__init__()
         self.input_size = 4096
@@ -150,7 +159,7 @@ class S2S(nn.Module):
         self.dropout = dropout
 
         self.encoder = Encoder(self.hidden_size, self.dropout)
-        self.decoder = Decoder(self.hidden_size, self.dropout)
+        self.decoder = Decoder(self.hidden_size, self.dropout, do_attn)
 
     def forward(self, input, target_outputs, target_lengths, sched_sampling_p=1):
 
