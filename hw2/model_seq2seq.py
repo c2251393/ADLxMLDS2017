@@ -27,6 +27,7 @@ parser.add_argument('-n', '--n_layers', type=int, default=int(1))
 parser.add_argument('-d', '--dropout', type=float, default=int(0.0))
 parser.add_argument('-M', '--Model', type=str, default='')
 parser.add_argument('-a', '--attn', action='store_true')
+parser.add_argument('-s', '--sample', type=str, default='ref')
 
 args = parser.parse_args()
 
@@ -165,8 +166,11 @@ def main():
     for epoch in range(1, args.n_epoch+1):
         print("================= EPOCH %d ======================" % epoch)
         for (i, bat) in enumerate(tr_loader, 1):
-            k = 64
-            prob = k / (k + math.exp(iter / k))
+            if args.sample == 'ref':
+                prob = 1
+            elif args.sample == 'sched':
+                k = 64
+                prob = k / (k + math.exp(iter / k))
             loss = train(bat, prob)
             if i % 1 == 0:
                 print("%s %d/%d %.4f p=%.2f" % (time_since(start), i, len(tr_loader), loss, prob))
@@ -179,7 +183,7 @@ def main():
 
             print("%s %d/%d %.4f" % (time_since(start), i, len(te_loader), loss))
 
-        model_name = "s2vt.h%d.b%d.e%d.pt" % (args.hidden_size, args.batch_size, epoch)
+        model_name = "s2vt.h%d.b%d.e%d.%s.pt" % (args.hidden_size, args.batch_size, epoch, args.sample)
 
         if epoch % 1 == 0:
             fp = open(model_name + ".ans", 'w')
