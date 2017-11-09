@@ -164,11 +164,11 @@ def main():
     for epoch in range(1, args.n_epoch+1):
         print("================= EPOCH %d ======================" % epoch)
         for (i, bat) in enumerate(tr_loader, 1):
-            k = 1
+            k = 64
             prob = k / (k + math.exp(iter / k))
             loss = train(bat, prob)
             if i % 1 == 0:
-                print("%s %d/%d %.4f" % (time_since(start), i, len(tr_loader), loss))
+                print("%s %d/%d %.4f p=%.2f" % (time_since(start), i, len(tr_loader), loss, prob))
             iter += 1
 
         for (i, bat) in enumerate(te_loader, 1):
@@ -180,11 +180,11 @@ def main():
 
         model_name = "s2vt.h%d.b%d.e%d.pt" % (args.hidden_size, args.batch_size, epoch)
 
-        if epoch % 30 == 0:
+        if epoch % 1 == 0:
             fp = open(model_name + ".ans", 'w')
             for (k, v) in test_ans.items():
                 fp.write("%s,%s\n" % (k, v))
             fp.close()
             torch.save(model.state_dict(), os.path.join("models", model_name))
 
-main()
+# main()
