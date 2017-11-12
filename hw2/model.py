@@ -95,18 +95,25 @@ class Decoder(nn.Module):
         self.W = nn.Linear(self.hidden_size, self.vocab_size)
         self.hc = None
 
-    def forward(self, output, hc, target_outputs, target_lengths, sched_sampling_p=1):
+    def forward(self,
+                output,
+                hc,
+                target_outputs,
+                target_lengths,
+                sched_sampling_p=1,
+                beam_search=-1
+                ):
         # target_outputs: (batch x MAXLEN)
         # target_lengths: (batch)
         batch_size = output.size(0)
         max_lens = torch.max(target_lengths).data[0]
         self.hc = hc
 
-        def decode(symbol):
+        def decode(symbol, hidden):
             # symbol: (batch)
             # output: (batch x len x hidden)
-            y = self.embed(symbol).unsqueeze(1)
-            y, self.hc = self.rnn(y, self.hc)
+            y = self.embed(symbol).view(-1, 1, self.hidden_size)
+            y, hidden = self.rnn(y, hidden)
             # y: (batch x 1 x hidden)
 
             if self.attn is not None:
@@ -123,27 +130,67 @@ class Decoder(nn.Module):
             # dec_o: (batch x 1 x vocab_size)
             dec_symbol = dec_o.topk(1, 2)[1]
             # dec_symbol: (batch x 1 x 1)
-            return dec_o.squeeze(), dec_symbol.squeeze()
+            return dec_o.squeeze(), dec_symbol.squeeze(), hidden
 
-        symbol = Variable(torch.LongTensor([SOS_TOKEN for _ in range(batch_size)]))
-        if USE_CUDA:
-            symbol = symbol.cuda()
-        dec_o = self.W(self.embed(symbol))
-        symbol_outs = []
-        decoder_outs = []
+        if beam_search == -1:
 
-        # target_outputs: (batch x MAXLEN)
-        for i in range(max_lens):
-            symbol_outs.append(symbol)
-            decoder_outs.append(dec_o)
-            if target_outputs is not None and random.random() < sched_sampling_p:
-                symbol = target_outputs[:,i]
-            dec_o, symbol = decode(symbol)
+            symbol = Variable(torch.LongTensor([SOS_TOKEN for _ in range(batch_size)]))
+            if USE_CUDA:
+                symbol = symbol.cuda()
+            dec_o = self.W(self.embed(symbol))
+            symbol_outs = []
+            decoder_outs = []
 
-        decoder_outs = torch.stack(decoder_outs, 1)
-        symbol_outs = torch.stack(symbol_outs, 1)
+            # target_outputs: (batch x MAXLEN)
+            for i in range(max_lens):
+                symbol_outs.append(symbol)
+                decoder_outs.append(dec_o)
+                if target_outputs is not None and random.random() < sched_sampling_p:
+                    symbol = target_outputs[:,i]
+                dec_o, symbol, self.hc = decode(symbol, self.hc)
 
-        return decoder_outs, symbol_outs
+            decoder_outs = torch.stack(decoder_outs, 1)
+            symbol_outs = torch.stack(symbol_outs, 1)
+
+            return decoder_outs, symbol_outs
+        else:
+            # Beam search: batch=1
+            symbol = Variable(torch.LongTensor([SOS_TOKEN]))
+            if USE_CUDA:
+                symbol = symbol.cuda()
+            dec_o = self.W(self.embed(symbol)).squeeze()
+
+            candidates = []
+            tmp_candidates = [(1.0, [dec_o], [symbol], self.hc)]
+            print("beam search ", beam_search)
+            print(dec_o.size())
+            for i in range(max_lens):
+                tmp_candidates.sort(key=lambda p: p[0], reverse=True)
+                candidates = tmp_candidates[:beam_search]
+                tmp_candidates = []
+                for (prob, decoder_outs, symbol_outs, hidden) in candidates:
+                    last_dec_o = decoder_outs[-1]
+                    last_symbol = symbol_outs[-1]
+                    dec_o, _, hidden = decode(last_symbol, hidden)
+                    # dec_o: (vocab_size)
+
+                    topk_symbols = dec_o.topk(beam_search)[1]
+                    p_sigma = F.log_softmax(dec_o)
+                    # (beam_search)
+                    for j in range(beam_search):
+                        next_symbol = topk_symbols[j]
+                        next_prob = prob + p_sigma[next_symbol.data[0]].data[0]
+                        tmp_candidates.append((
+                            next_prob,
+                            decoder_outs + [dec_o],
+                            symbol_outs + [next_symbol],
+                            hidden))
+
+            (_, decoder_outs, symbol_outs, _) = candidates[0]
+            decoder_outs = torch.stack(decoder_outs).view(1, -1)
+            symbol_outs = torch.stack(symbol_outs).view(1, -1)
+
+            return decoder_outs, symbol_outs
 
 
 class S2S(nn.Module):
@@ -161,10 +208,12 @@ class S2S(nn.Module):
         self.encoder = Encoder(self.hidden_size, self.dropout)
         self.decoder = Decoder(self.hidden_size, self.dropout, do_attn)
 
-    def forward(self, input, target_outputs, target_lengths, sched_sampling_p=1):
+    def forward(self, input, target_outputs, target_lengths,
+                sched_sampling_p=1,
+                beam_search=-1):
 
         output, hc = self.encoder(input)
 
-        decoder_outs, symbol_outs = self.decoder(output, hc, target_outputs, target_lengths, sched_sampling_p)
+        decoder_outs, symbol_outs = self.decoder(output, hc, target_outputs, target_lengths, sched_sampling_p, beam_search)
 
         return decoder_outs, symbol_outs

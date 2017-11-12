@@ -32,6 +32,8 @@ parser.add_argument('-n', '--n_layers', type=int, default=int(1))
 parser.add_argument('-d', '--dropout', type=float, default=int(0.0))
 parser.add_argument('-M', '--Model', type=str, default='')
 parser.add_argument('-a', '--attn', action='store_true')
+parser.add_argument('-B', '--beam_search', type=int, default=int(-1))
+parser.add_argument('-x', '--special', action='store_true')
 
 args = parser.parse_args()
 
@@ -110,11 +112,11 @@ tr_data = MSVD_tr(args.data)
 tr_loader = DataLoader(tr_data, batch_size=args.batch_size, shuffle=True)
 
 te_data = MSVD_te(args.data)
-te_loader = DataLoader(te_data, batch_size=args.batch_size, shuffle=True)
+te_loader = DataLoader(te_data, batch_size=1, shuffle=True)
 
 if args.peer_o != 'nan':
     peer_data = MSVD_peer(args.data)
-    peer_loader = DataLoader(te_data, batch_size=args.batch_size, shuffle=True)
+    peer_loader = DataLoader(te_data, batch_size=1, shuffle=True)
 
 
 model = model.S2S(args.hidden_size, args.dropout, args.attn)
@@ -125,6 +127,7 @@ state_dict = torch.load(os.path.join("models", args.model_file), map_location=la
 model.load_state_dict(state_dict)
 model.eval()
 
+print("beam search ", args.beam_search)
 
 def test(batch):
     batch_size = len(batch['id'])
@@ -132,16 +135,18 @@ def test(batch):
     if USE_CUDA:
         X = X.cuda()
 
-    decoder_outs, symbol_outs = model(X, None, Variable(torch.LongTensor([MAXLEN])))
+    decoder_outs, symbol_outs = model(X, None, Variable(torch.LongTensor([MAXLEN])), 1, args.beam_search)
 
     return symbol_outs
 
 test_ans = {}
 peer_ans = {}
 
+special = ['klteYv1Uv9A_27_33.avi', '5YJaS2Eswg0_22_26.avi', 'UbmZAe5u5FI_132_141.avi', 'JntMAcTlOF0_50_70.avi', 'tJHUH9tpqPg_113_118.avi']
 
 def main():
     start = time.time()
+    print(args.special)
 
     for (i, bat) in enumerate(te_loader, 1):
         symbol_outs = test(bat)
@@ -151,7 +156,8 @@ def main():
 
     fp = open(args.test_o, 'w')
     for (k, v) in test_ans.items():
-        fp.write("%s,%s\n" % (k, v))
+        if not args.special or k in special:
+            fp.write("%s,%s\n" % (k, v))
     fp.close()
 
     if args.peer_o == 'nan':

@@ -96,7 +96,7 @@ tr_data = MSVD_tr(args.data)
 tr_loader = DataLoader(tr_data, batch_size=args.batch_size, shuffle=True)
 
 te_data = MSVD_te(args.data)
-te_loader = DataLoader(te_data, batch_size=args.batch_size, shuffle=True)
+te_loader = DataLoader(te_data, shuffle=True)
 
 model = model.S2S(args.hidden_size, args.dropout, args.attn)
 if USE_CUDA:
