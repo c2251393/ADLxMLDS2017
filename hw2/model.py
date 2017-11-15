@@ -54,11 +54,10 @@ class Attention(nn.Module):
         # encoder_output: (batch x len x hidden)
         batch_size = hidden.size(0)
         len = encoder_outputs.size(1)
-        # hidden: (batch x 1 x hidden)
 
         hidden = self.attn(hidden)
-        encoder_outputs = encoder_outputs.transpose(1, 2)
         # hidden: (batch x 1 x hidden)
+        encoder_outputs = encoder_outputs.transpose(1, 2)
         # encoder_output: (batch x hidden x len)
         attn_energies = hidden.bmm(encoder_outputs)
         # (batch x 1 x len)
@@ -106,7 +105,8 @@ class Decoder(nn.Module):
         # target_outputs: (batch x MAXLEN)
         # target_lengths: (batch)
         batch_size = output.size(0)
-        max_lens = torch.max(target_lengths).data[0]
+        max_lens = MAXLEN
+        # max_lens = torch.max(target_lengths).data[0]
         self.hc = hc
 
         def decode(symbol, hidden):
@@ -137,7 +137,9 @@ class Decoder(nn.Module):
             symbol = Variable(torch.LongTensor([SOS_TOKEN for _ in range(batch_size)]))
             if USE_CUDA:
                 symbol = symbol.cuda()
+            # symbol: (batch)
             dec_o = self.W(self.embed(symbol))
+            # dec_o: (batch x hidden)
             symbol_outs = []
             decoder_outs = []
 
@@ -150,7 +152,9 @@ class Decoder(nn.Module):
                 dec_o, symbol, self.hc = decode(symbol, self.hc)
 
             decoder_outs = torch.stack(decoder_outs, 1)
+            # (batch x max_lens x vocab)
             symbol_outs = torch.stack(symbol_outs, 1)
+            # (batch x max_lens)
 
             return decoder_outs, symbol_outs
         else:

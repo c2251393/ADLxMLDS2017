@@ -52,8 +52,8 @@ class MSVD_tr(Dataset):
                 lens.append(0)
             x['cap_lens'] = lens
 
-            x['caption'] = x['caption'][0]
-            x['cap_lens'] = x['cap_lens'][0]
+            # x['caption'] = x['caption'][0]
+            # x['cap_lens'] = x['cap_lens'][0]
 
     def __len__(self):
         return len(self.data)
@@ -82,8 +82,8 @@ class MSVD_te(Dataset):
                 lens.append(0)
             x['cap_lens'] = lens
 
-            x['caption'] = x['caption'][0]
-            x['cap_lens'] = x['cap_lens'][0]
+            # x['caption'] = x['caption'][0]
+            # x['cap_lens'] = x['cap_lens'][0]
 
     def __len__(self):
         return len(self.data)
@@ -96,7 +96,7 @@ tr_data = MSVD_tr(args.data)
 tr_loader = DataLoader(tr_data, batch_size=args.batch_size, shuffle=True)
 
 te_data = MSVD_te(args.data)
-te_loader = DataLoader(te_data, shuffle=True)
+te_loader = DataLoader(te_data, batch_size=args.batch_size, shuffle=True)
 
 model = model.S2S(args.hidden_size, args.dropout, args.attn)
 if USE_CUDA:
@@ -114,8 +114,15 @@ def train(batch, sched_sampling_p=1):
     batch_size = len(batch['id'])
 
     X = Variable(batch['feat'])
-    target_outputs = Variable(torch.stack(batch['caption']))
-    target_lengths = Variable(batch['cap_lens'])
+    cap_idxs = [[] for i in range(batch_size)]
+    for i in range(batch_size):
+        good_idxs = [j for j in range(MAX_N_CAP) if batch['cap_lens'][j][i] > 0]
+        cap_idxs[i] = random.sample(good_idxs, 5)
+
+    target_outputs = Variable(torch.stack([
+        batch['caption'][cids[0]][i] for (i, cids) in enumerate(cap_idxs)]))
+    target_lengths = Variable(torch.LongTensor([
+        batch['cap_lens'][cids[0]][i] for (i, cids) in enumerate(cap_idxs)]))
     if USE_CUDA:
         X = X.cuda()
         target_outputs = target_outputs.cuda()
@@ -123,16 +130,24 @@ def train(batch, sched_sampling_p=1):
 
     decoder_outs, symbol_outs = model(X, target_outputs, target_lengths, sched_sampling_p)
 
+    tot_len = 0
+
     for i in range(batch_size):
-        tlen = target_lengths[i].data[0]
-        loss += criterion(decoder_outs[i][:tlen], target_outputs[i][:tlen])
+        cids = cap_idxs[i]
+        for j in range(len(cids)):
+            tlen = batch['cap_lens'][cids[j]][i]
+            tot_len += tlen
+            sent = Variable(batch['caption'][cids[j]][i][:tlen])
+            if USE_CUDA:
+                sent.cuda()
+            loss += criterion(decoder_outs[i][:tlen], sent)
 
     if USE_CUDA:
         loss.cuda()
     loss.backward()
     opt.step()
 
-    return loss.data[0]
+    return loss.data[0] / tot_len
 
 
 def eval(batch):
@@ -141,8 +156,15 @@ def eval(batch):
     batch_size = len(batch['id'])
 
     X = Variable(batch['feat'])
-    target_outputs = Variable(torch.stack(batch['caption']))
-    target_lengths = Variable(batch['cap_lens'])
+    cap_idxs = [[] for i in range(batch_size)]
+    for i in range(batch_size):
+        good_idxs = [j for j in range(MAX_N_CAP) if batch['cap_lens'][j][i] > 0]
+        cap_idxs[i] = random.sample(good_idxs, 5)
+
+    target_outputs = Variable(torch.stack([
+        batch['caption'][cids[0]][i] for (i, cids) in enumerate(cap_idxs)]))
+    target_lengths = Variable(torch.LongTensor([
+        batch['cap_lens'][cids[0]][i] for (i, cids) in enumerate(cap_idxs)]))
     if USE_CUDA:
         X = X.cuda()
         target_outputs = target_outputs.cuda()
@@ -152,11 +174,19 @@ def eval(batch):
 
     loss = 0
 
-    for i in range(batch_size):
-        tlen = target_lengths[i].data[0]
-        loss += criterion(decoder_outs[i][:tlen], target_outputs[i][:tlen])
+    tot_len = 0
 
-    return loss.data[0], symbol_outs
+    for i in range(batch_size):
+        cids = cap_idxs[i]
+        for j in range(len(cids)):
+            tlen = batch['cap_lens'][cids[j]][i]
+            tot_len += tlen
+            sent = Variable(batch['caption'][cids[j]][i][:tlen])
+            if USE_CUDA:
+                sent.cuda()
+            loss += criterion(decoder_outs[i][:tlen], sent)
+
+    return loss.data[0] / tot_len, symbol_outs
 
 test_ans = {}
 
@@ -165,12 +195,13 @@ def main():
     iter = 1
     for epoch in range(1, args.n_epoch+1):
         print("================= EPOCH %d ======================" % epoch)
+        if args.sample == 'ref':
+            prob = 1
+        elif args.sample == 'sched':
+            prob = 1.0 - epoch / args.n_epoch
+            # k = 64
+            # prob = k / (k + math.exp(iter / k))
         for (i, bat) in enumerate(tr_loader, 1):
-            if args.sample == 'ref':
-                prob = 1
-            elif args.sample == 'sched':
-                k = 64
-                prob = k / (k + math.exp(iter / k))
             loss = train(bat, prob)
             if i % 1 == 0:
                 print("%s %d/%d %.4f p=%.2f" % (time_since(start), i, len(tr_loader), loss, prob))
