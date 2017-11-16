@@ -174,7 +174,7 @@ def eval(batch):
             tot_len += tlen
             sent = Variable(batch['caption'][cids[j]][i][:tlen])
             if USE_CUDA:
-                sent.cuda()
+                sent = sent.cuda()
             loss += criterion(decoder_outs[i][:tlen], sent)
 
     return loss.data[0] / tot_len, symbol_outs
