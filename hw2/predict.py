@@ -126,9 +126,9 @@ attn = state_dict["attn"]
 encoder = model.Encoder(hidden_size, n_layers, 0)
 decoder = model.Decoder(hidden_size, embed_size, n_layers, 0, attn)
 encoder.load_state_dict(state_dict["encoder"])
-dncoder.load_state_dict(state_dict["dncoder"])
+decoder.load_state_dict(state_dict["decoder"])
 encoder.eval()
-dncoder.eval()
+decoder.eval()
 if USE_CUDA:
     encoder.cuda()
     decoder.cuda()
