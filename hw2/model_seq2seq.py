@@ -131,7 +131,7 @@ def train(batch, sched_sampling_p=1):
     use_teacher = random.random() < sched_sampling_p
 
     decoder_input = target_outputs[0]
-    decoder_context = Variable(torch.zeros(batch_size, 1, self.hidden_size))
+    decoder_context = Variable(torch.zeros(batch_size, 1, args.hidden_size))
     if USE_CUDA:
         decoder_input = decoder_input.cuda()
         decoder_context = decoder_context.cuda()
@@ -213,7 +213,7 @@ def eval(batch):
     encoder_outputs, hidden = encoder(X)
 
     decoder_input = target_outputs[0]
-    decoder_context = Variable(torch.zeros(batch_size, 1, self.hidden_size))
+    decoder_context = Variable(torch.zeros(batch_size, 1, args.hidden_size))
     if USE_CUDA:
         decoder_input = decoder_input.cuda()
         decoder_context = decoder_context.cuda()
