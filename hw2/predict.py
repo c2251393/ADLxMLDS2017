@@ -23,16 +23,7 @@ parser.add_argument('peer_o', default='sample_output_peer_review.txt',
                     help='peer review set output')
 parser.add_argument('-l', '--lr', type=float, default=float(0.001))
 parser.add_argument('-e', '--n_epoch', type=int, default=int(200))
-parser.add_argument('-wx', '--window_size_x', type=int, default=int(3))
-parser.add_argument('-wy', '--window_size_y', type=int, default=int(2))
-parser.add_argument('-p', '--pool_size', type=int, default=int(2))
-parser.add_argument('-H', '--hidden_size', type=int, default=int(256))
-parser.add_argument('-E', '--embed_size', type=int, default=int(256))
 parser.add_argument('-b', '--batch_size', type=int, default=int(16))
-parser.add_argument('-n', '--n_layers', type=int, default=int(1))
-parser.add_argument('-d', '--dropout', type=float, default=int(0.0))
-parser.add_argument('-M', '--Model', type=str, default='')
-parser.add_argument('-a', '--attn', action='store_true')
 parser.add_argument('-B', '--beam_search', type=int, default=int(-1))
 parser.add_argument('-x', '--special', action='store_true')
 
@@ -128,13 +119,17 @@ if args.peer_o != 'nan':
         peer_loader = DataLoader(te_data, batch_size=1, shuffle=True)
 
 
-model = model.S2S(args.hidden_size, args.embed_size, args.n_layers, args.dropout, args.attn)
-if USE_CUDA:
-    model.cuda()
-
 state_dict = torch.load(os.path.join("models", args.model_file), map_location=lambda storage, location: storage)
-model.load_state_dict(state_dict)
-model.eval()
+hidden_size = state_dict["hidden_size"]
+embed_size = state_dict["embed_size"]
+n_layers = state_dict["n_layers"]
+attn = state_dict["attn"]
+
+encoder = model.Encoder(hidden_size, n_layers, 0)
+decoder = model.Decoder(hidden_size, embed_size, n_layers, 0, attn)
+if USE_CUDA:
+    encoder.cuda()
+    decoder.cuda()
 
 print("beam search ", args.beam_search)
 
@@ -144,7 +139,14 @@ def test(batch):
     if USE_CUDA:
         X = X.cuda()
 
-    decoder_outs, symbol_outs = model(X, None, Variable(torch.LongTensor([MAXLEN])), 1, args.beam_search)
+    encoder_outputs, hidden = encoder(X)
+
+    decoder_outs, symbol_outs = decoder(encoder_outputs,
+                                        hidden,
+                                        None,
+                                        Variable(torch.LongTensor([MAXLEN])),
+                                        1,
+                                        args.beam_search)
 
     return symbol_outs
 

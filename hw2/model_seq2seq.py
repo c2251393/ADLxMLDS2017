@@ -18,9 +18,6 @@ parser.add_argument('data', default='./data/',
                     help='data folder')
 parser.add_argument('-l', '--lr', type=float, default=float(0.0001))
 parser.add_argument('-e', '--n_epoch', type=int, default=int(300))
-parser.add_argument('-wx', '--window_size_x', type=int, default=int(3))
-parser.add_argument('-wy', '--window_size_y', type=int, default=int(2))
-parser.add_argument('-p', '--pool_size', type=int, default=int(2))
 parser.add_argument('-H', '--hidden_size', type=int, default=int(256))
 parser.add_argument('-E', '--embed_size', type=int, default=int(256))
 parser.add_argument('-b', '--batch_size', type=int, default=int(16))
@@ -92,20 +89,18 @@ tr_loader = DataLoader(tr_data, batch_size=args.batch_size, shuffle=True)
 te_data = MSVD_te(args.data)
 te_loader = DataLoader(te_data, batch_size=args.batch_size, shuffle=True)
 
-model = model.S2S(args.hidden_size, args.embed_size, args.n_layers, args.dropout, args.attn)
+encoder = model.Encoder(args.hidden_size, args.n_layers, args.dropout)
+decoder = model.Decoder(args.hidden_size, args.embed_size, args.n_layers, args.dropout, args.attn)
 if USE_CUDA:
-    model.cuda()
+    encoder.cuda()
+    decoder.cuda()
 
-opt = torch.optim.Adam(model.parameters(), lr = args.lr)
+encoder_opt = torch.optim.Adam(encoder.parameters(), lr=args.lr)
+decoder_opt = torch.optim.Adam(decoder.parameters(), lr=args.lr)
 criterion = nn.CrossEntropyLoss()
 
-clip = 20.0
 
 def train(batch, sched_sampling_p=1):
-    model.train()
-    opt.zero_grad()
-    loss = 0
-
     batch_size = len(batch['id'])
     cap_idxs = []
     for i in range(batch_size):
@@ -122,8 +117,21 @@ def train(batch, sched_sampling_p=1):
         target_outputs = target_outputs.cuda()
         target_lengths = target_lengths.cuda()
 
-    decoder_outs, symbol_outs = model(X, target_outputs, target_lengths, sched_sampling_p)
+    encoder.train()
+    decoder.train()
+    encoder_opt.zero_grad()
+    decoder_opt.zero_grad()
 
+    encoder_outputs, hidden = encoder(X)
+
+    decoder_outs, symbol_outs = decoder(encoder_outputs,
+                                        hidden,
+                                        target_outputs,
+                                        target_lengths,
+                                        sched_sampling_p,
+                                        -1)
+
+    loss = 0
     tot_len = 0
 
     for i in range(batch_size):
@@ -139,15 +147,13 @@ def train(batch, sched_sampling_p=1):
     if USE_CUDA:
         loss = loss.cuda()
     loss.backward()
-    torch.nn.utils.clip_grad_norm(model.parameters(), clip)
-    opt.step()
+    encoder_opt.step()
+    decoder_opt.step()
 
     return loss.data[0] / tot_len
 
 
 def eval(batch):
-    model.eval()
-
     batch_size = len(batch['id'])
 
     X = Variable(batch['feat'])
@@ -165,7 +171,15 @@ def eval(batch):
         target_outputs = target_outputs.cuda()
         target_lengths = target_lengths.cuda()
 
-    decoder_outs, symbol_outs = model(X, None, Variable(torch.LongTensor([MAXLEN])))
+    encoder.eval()
+    decoder.eval()
+
+    encoder_outputs, hidden = encoder(X)
+
+    decoder_outs, symbol_outs = decoder(encoder_outputs,
+                                        hidden,
+                                        None,
+                                        Variable(torch.LongTensor([MAXLEN])))
 
     loss = 0
 
@@ -221,6 +235,17 @@ def main():
             for (k, v) in test_ans.items():
                 fp.write("%s,%s\n" % (k, v))
             fp.close()
+            torch.save(
+                {
+                    "encoder": encoder.state_dict(),
+                    "decoder": decoder.state_dict(),
+                    "hidden_size": args.hidden_size,
+                    "embed_size": args.embed_size,
+                    "n_layers": args.n_layers,
+                    "attn": args.attn
+                },
+                os.path.join("models", model_name)
+            )
             torch.save(model.state_dict(), os.path.join("models", model_name))
 
 main()
