@@ -70,12 +70,14 @@ class Attention(nn.Module):
 class Decoder(nn.Module):
     def __init__(self,
                  hidden_size,
+                 embed_size,
                  dropout,
                  do_attn=True
                  ):
         super(Decoder, self).__init__()
         self.input_size = 4096
         self.vocab_size = len(lang.word2id)
+        self.embed_size = embed_size
         self.hidden_size = hidden_size
         self.dropout = dropout
 
@@ -85,13 +87,13 @@ class Decoder(nn.Module):
         else:
             self.attn = None
             self.concat = None
-        self.rnn = nn.LSTM(self.hidden_size,
+        self.rnn = nn.LSTM(self.hidden_size + self.embed_size,
                            self.hidden_size,
                            1,
                            dropout=self.dropout,
                            batch_first=True)
-        self.embed = nn.Embedding(self.vocab_size, self.hidden_size)
-        self.W = nn.Linear(self.hidden_size, self.vocab_size)
+        self.embed = nn.Embedding(self.vocab_size, self.embed_size)
+        self.W = nn.Linear(self.hidden_size*2, self.vocab_size)
         self.hc = None
 
     def forward(self,
@@ -109,37 +111,40 @@ class Decoder(nn.Module):
         # max_lens = torch.max(target_lengths).data[0]
         self.hc = hc
 
-        def decode(symbol, hidden):
+        def decode(symbol, hidden, prv_context):
             # symbol: (batch)
-            # output: (batch x len x hidden)
-            y = self.embed(symbol).view(-1, 1, self.hidden_size)
+            # output: (batch, len, hidden)
+            embed = self.embed(symbol).view(-1, 1, self.embed_size)
+            # embed: (batch x 1 x embed)
+            y = torch.cat((embed, prv_context), 2)
+            # y: (batch x 1 x (embed + hidden))
             y, hidden = self.rnn(y, hidden)
             # y: (batch x 1 x hidden)
 
-            if self.attn is not None:
-                A = self.attn(y, output).unsqueeze(1)
-                # A: (batch x 1 x len)
-                c = A.bmm(output)
-                # c: (batch x 1 x hidden)
-                yc = F.tanh(self.concat(torch.cat((y, c), 2)))
-                # yc: (batch x 1 x hidden)
-            else:
-                yc = y
+            A = self.attn(y, output).unsqueeze(1)
+            # A: (batch x 1 x len)
+            c = A.bmm(output)
+            # c: (batch x 1 x hidden)
+            yc = torch.cat((y, c), 2)
+            # yc: (batch x 1 x hidden*2)
 
             dec_o = self.W(yc)
             # dec_o: (batch x 1 x vocab_size)
             dec_symbol = dec_o.topk(1, 2)[1]
             # dec_symbol: (batch x 1 x 1)
-            return dec_o.squeeze(), dec_symbol.squeeze(), hidden
+            return dec_o.squeeze(), dec_symbol.squeeze(), hidden, c
+
+        symbol = Variable(torch.LongTensor([SOS_TOKEN]))
+        context = Variable(torch.zeros(batch_size, 1, self.hidden_size))
+        if USE_CUDA:
+            symbol = symbol.cuda()
+            context = context.cuda()
+        # symbol: (batch)
+        # context: (batch, 1, hidden)
+        dec_o = self.W(self.embed(symbol)).squeeze()
+        # dec_o: (batch, hidden)
 
         if beam_search == -1:
-
-            symbol = Variable(torch.LongTensor([SOS_TOKEN for _ in range(batch_size)]))
-            if USE_CUDA:
-                symbol = symbol.cuda()
-            # symbol: (batch)
-            dec_o = self.W(self.embed(symbol))
-            # dec_o: (batch x hidden)
             symbol_outs = []
             decoder_outs = []
 
@@ -149,7 +154,7 @@ class Decoder(nn.Module):
                 decoder_outs.append(dec_o)
                 if target_outputs is not None and random.random() < sched_sampling_p:
                     symbol = target_outputs[:,i]
-                dec_o, symbol, self.hc = decode(symbol, self.hc)
+                dec_o, symbol, self.hc, context = decode(symbol, self.hc, context)
 
             decoder_outs = torch.stack(decoder_outs, 1)
             # (batch x max_lens x vocab)
@@ -159,10 +164,6 @@ class Decoder(nn.Module):
             return decoder_outs, symbol_outs
         else:
             # Beam search: batch=1
-            symbol = Variable(torch.LongTensor([SOS_TOKEN]))
-            if USE_CUDA:
-                symbol = symbol.cuda()
-            dec_o = self.W(self.embed(symbol)).squeeze()
 
             candidates = []
             tmp_candidates = [(1.0, [dec_o], [symbol], self.hc)]
@@ -200,6 +201,7 @@ class Decoder(nn.Module):
 class S2S(nn.Module):
     def __init__(self,
                  hidden_size=256,
+                 embed_size=256,
                  dropout=0,
                  do_attn=True
                  ):
@@ -207,10 +209,11 @@ class S2S(nn.Module):
         self.input_size = 4096
         self.vocab_size = len(lang.word2id)
         self.hidden_size = hidden_size
+        self.embed_size = embed_size
         self.dropout = dropout
 
         self.encoder = Encoder(self.hidden_size, self.dropout)
-        self.decoder = Decoder(self.hidden_size, self.dropout, do_attn)
+        self.decoder = Decoder(self.hidden_size, self.embed_size, self.dropout, do_attn)
 
     def forward(self, input, target_outputs, target_lengths,
                 sched_sampling_p=1,

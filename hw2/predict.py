@@ -119,7 +119,7 @@ if args.peer_o != 'nan':
     peer_loader = DataLoader(te_data, batch_size=1, shuffle=True)
 
 
-model = model.S2S(args.hidden_size, args.dropout, args.attn)
+model = model.S2S(args.hidden_size, EMBED_SIZE, args.dropout, args.attn)
 if USE_CUDA:
     model.cuda()
 

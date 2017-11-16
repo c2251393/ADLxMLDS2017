@@ -41,7 +41,6 @@ class MSVD_tr(Dataset):
             cap["feat"] = np.load(fn).astype('float32')
 
         for x in self.data:
-            random.shuffle(x['caption'])
             caps = x['caption']
             lens = []
             for i in range(len(caps)):
@@ -51,9 +50,6 @@ class MSVD_tr(Dataset):
                 caps.append(np.array([PAD_TOKEN] * MAXLEN))
                 lens.append(0)
             x['cap_lens'] = lens
-
-            # x['caption'] = x['caption'][0]
-            # x['cap_lens'] = x['cap_lens'][0]
 
     def __len__(self):
         return len(self.data)
@@ -71,7 +67,6 @@ class MSVD_te(Dataset):
             cap["feat"] = np.load(fn).astype('float32')
 
         for x in self.data:
-            random.shuffle(x['caption'])
             caps = x['caption']
             lens = []
             for i in range(len(caps)):
@@ -81,9 +76,6 @@ class MSVD_te(Dataset):
                 caps.append(np.array([PAD_TOKEN] * MAXLEN))
                 lens.append(0)
             x['cap_lens'] = lens
-
-            # x['caption'] = x['caption'][0]
-            # x['cap_lens'] = x['cap_lens'][0]
 
     def __len__(self):
         return len(self.data)
@@ -98,7 +90,7 @@ tr_loader = DataLoader(tr_data, batch_size=args.batch_size, shuffle=True)
 te_data = MSVD_te(args.data)
 te_loader = DataLoader(te_data, batch_size=args.batch_size, shuffle=True)
 
-model = model.S2S(args.hidden_size, args.dropout, args.attn)
+model = model.S2S(args.hidden_size, EMBED_SIZE, args.dropout, args.attn)
 if USE_CUDA:
     model.cuda()
 
@@ -112,13 +104,12 @@ def train(batch, sched_sampling_p=1):
     loss = 0
 
     batch_size = len(batch['id'])
-
-    X = Variable(batch['feat'])
-    cap_idxs = [[] for i in range(batch_size)]
+    cap_idxs = []
     for i in range(batch_size):
         good_idxs = [j for j in range(MAX_N_CAP) if batch['cap_lens'][j][i] > 0]
-        cap_idxs[i] = random.sample(good_idxs, 5)
+        cap_idxs.append(random.sample(good_idxs, 5))
 
+    X = Variable(batch['feat'])
     target_outputs = Variable(torch.stack([
         batch['caption'][cids[0]][i] for (i, cids) in enumerate(cap_idxs)]))
     target_lengths = Variable(torch.LongTensor([
@@ -139,11 +130,11 @@ def train(batch, sched_sampling_p=1):
             tot_len += tlen
             sent = Variable(batch['caption'][cids[j]][i][:tlen])
             if USE_CUDA:
-                sent.cuda()
+                sent = sent.cuda()
             loss += criterion(decoder_outs[i][:tlen], sent)
 
     if USE_CUDA:
-        loss.cuda()
+        loss = loss.cuda()
     loss.backward()
     opt.step()
 
@@ -223,4 +214,4 @@ def main():
             fp.close()
             torch.save(model.state_dict(), os.path.join("models", model_name))
 
-main()
+# main()
