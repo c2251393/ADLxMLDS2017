@@ -88,16 +88,22 @@ class Decoder(nn.Module):
         if do_attn:
             self.attn = Attention(self.hidden_size)
             self.concat = nn.Linear(2*self.hidden_size, self.hidden_size)
+            self.rnn = nn.LSTM(self.hidden_size + self.embed_size,
+                               self.hidden_size,
+                               self.n_layers,
+                               dropout=self.dropout,
+                               batch_first=True)
+            self.W = nn.Linear(self.hidden_size*2, self.vocab_size)
         else:
             self.attn = None
             self.concat = None
-        self.rnn = nn.LSTM(self.hidden_size + self.embed_size,
-                           self.hidden_size,
-                           self.n_layers,
-                           dropout=self.dropout,
-                           batch_first=True)
+            self.rnn = nn.LSTM(self.embed_size,
+                               self.hidden_size,
+                               self.n_layers,
+                               dropout=self.dropout,
+                               batch_first=True)
+            self.W = nn.Linear(self.hidden_size, self.vocab_size)
         self.embed = nn.Embedding(self.vocab_size, self.embed_size)
-        self.W = nn.Linear(self.hidden_size*2, self.vocab_size)
         self.hc = None
 
     def forward(self,
@@ -120,20 +126,30 @@ class Decoder(nn.Module):
             # output: (batch, len, hidden)
             embed = self.embed(symbol).view(-1, 1, self.embed_size)
             # embed: (batch x 1 x embed)
-            y = torch.cat((embed, prv_context), 2)
-            # y: (batch x 1 x (embed + hidden))
-            y, hidden = self.rnn(y, hidden)
-            # y: (batch x 1 x hidden)
 
-            A = self.attn(y, output).unsqueeze(1)
-            # A: (batch x 1 x len)
-            c = A.bmm(output)
-            # c: (batch x 1 x hidden)
-            yc = torch.cat((y, c), 2)
-            # yc: (batch x 1 x hidden*2)
+            if self.attn:
+                y = torch.cat((embed, prv_context), 2)
+                # y: (batch x 1 x (embed + hidden))
+                y, hidden = self.rnn(y, hidden)
+                # y: (batch x 1 x hidden)
 
-            dec_o = self.W(yc)
-            # dec_o: (batch x 1 x vocab_size)
+                A = self.attn(y, output).unsqueeze(1)
+                # A: (batch x 1 x len)
+                c = A.bmm(output)
+                # c: (batch x 1 x hidden)
+                yc = torch.cat((y, c), 2)
+                # yc: (batch x 1 x hidden*2)
+
+                dec_o = self.W(yc)
+                # dec_o: (batch x 1 x vocab_size)
+            else:
+                y = embed
+                y, hidden = self.rnn(y, hidden)
+                # y: (batch x 1 x hidden)
+                c = prv_context
+                dec_o = self.W(yc)
+                # dec_o: (batch x 1 x vocab_size)
+
             dec_symbol = dec_o.topk(1, 2)[1]
             # dec_symbol: (batch x 1 x 1)
             return dec_o.squeeze(), dec_symbol.squeeze(), hidden, c
