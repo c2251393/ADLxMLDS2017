@@ -302,4 +302,4 @@ def main():
                 os.path.join("models", model_name)
             )
 
-# main()
+main()
