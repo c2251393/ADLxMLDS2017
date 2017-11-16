@@ -246,6 +246,5 @@ def main():
                 },
                 os.path.join("models", model_name)
             )
-            torch.save(model.state_dict(), os.path.join("models", model_name))
 
 main()
