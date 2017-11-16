@@ -136,13 +136,15 @@ class Decoder(nn.Module):
 
         symbol = Variable(torch.LongTensor([SOS_TOKEN]))
         context = Variable(torch.zeros(batch_size, 1, self.hidden_size))
+        dec_o = Variable(torch.zeros(batch_size, self.vocab_size))
+        dec_o[:, SOS_TOKEN] = 1.0
         if USE_CUDA:
             symbol = symbol.cuda()
             context = context.cuda()
+            dec_o = dec_o.cuda()
         # symbol: (batch)
         # context: (batch, 1, hidden)
-        dec_o = self.W(self.embed(symbol)).squeeze()
-        # dec_o: (batch, hidden)
+        # dec_o: (batch, vocab)
 
         if beam_search == -1:
             symbol_outs = []
