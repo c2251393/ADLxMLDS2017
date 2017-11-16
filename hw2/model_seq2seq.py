@@ -198,7 +198,7 @@ def main():
             # prob = k / (k + math.exp(iter / k))
         for (i, bat) in enumerate(tr_loader, 1):
             loss = train(bat, prob)
-            if i % 1 == 0:
+            if i % 30 == 0:
                 print("%s %d/%d %.4f p=%.2f" % (time_since(start), i, len(tr_loader), loss, prob))
             iter += 1
 
@@ -209,13 +209,18 @@ def main():
 
             print("%s %d/%d %.4f" % (time_since(start), i, len(te_loader), loss))
 
-        model_name = "s2vt.h%d.b%d.e%d.%s.pt" % (args.hidden_size, args.batch_size, epoch, args.sample)
+        model_name = "s2vt.H%d.E%d.N%d.b%d.e%d.%s.pt" % (args.hidden_size,
+                                                         args.embed_size,
+                                                         args.n_layers,
+                                                         args.batch_size,
+                                                         epoch,
+                                                         args.sample)
 
-        if epoch % 1 == 0:
+        if epoch % 20 == 0:
             fp = open(model_name + ".ans", 'w')
             for (k, v) in test_ans.items():
                 fp.write("%s,%s\n" % (k, v))
             fp.close()
             torch.save(model.state_dict(), os.path.join("models", model_name))
 
-# main()
+main()
