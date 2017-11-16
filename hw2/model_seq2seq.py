@@ -223,12 +223,13 @@ def main():
 
             print("%s %d/%d %.4f" % (time_since(start), i, len(te_loader), loss))
 
-        model_name = "s2vt.H%d.E%d.N%d.b%d.e%d.%s.pt" % (args.hidden_size,
-                                                         args.embed_size,
-                                                         args.n_layers,
-                                                         args.batch_size,
-                                                         epoch,
-                                                         args.sample)
+        model_name = "s2vt.H%d.E%d.N%d.A%d.b%d.e%d.%s.pt" % (args.hidden_size,
+                                                             args.embed_size,
+                                                             args.n_layers,
+                                                             1 if args.attn else 0,
+                                                             args.batch_size,
+                                                             epoch,
+                                                             args.sample)
 
         if epoch % 20 == 0:
             fp = open(model_name + ".ans", 'w')

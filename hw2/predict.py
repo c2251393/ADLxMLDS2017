@@ -21,8 +21,6 @@ parser.add_argument('test_o', default='sample_output_testset.txt',
                     help='test set output')
 parser.add_argument('peer_o', default='sample_output_peer_review.txt',
                     help='peer review set output')
-parser.add_argument('-l', '--lr', type=float, default=float(0.001))
-parser.add_argument('-e', '--n_epoch', type=int, default=int(200))
 parser.add_argument('-b', '--batch_size', type=int, default=int(16))
 parser.add_argument('-B', '--beam_search', type=int, default=int(-1))
 parser.add_argument('-x', '--special', action='store_true')
@@ -127,6 +125,10 @@ attn = state_dict["attn"]
 
 encoder = model.Encoder(hidden_size, n_layers, 0)
 decoder = model.Decoder(hidden_size, embed_size, n_layers, 0, attn)
+encoder.load_state_dict(state_dict["encoder"])
+dncoder.load_state_dict(state_dict["dncoder"])
+encoder.eval()
+dncoder.eval()
 if USE_CUDA:
     encoder.cuda()
     decoder.cuda()
