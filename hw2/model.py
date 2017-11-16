@@ -134,7 +134,7 @@ class Decoder(nn.Module):
             # dec_symbol: (batch x 1 x 1)
             return dec_o.squeeze(), dec_symbol.squeeze(), hidden, c
 
-        symbol = Variable(torch.LongTensor([SOS_TOKEN]))
+        symbol = Variable(torch.LongTensor([SOS_TOKEN for _ in range(batch_size)]))
         context = Variable(torch.zeros(batch_size, 1, self.hidden_size))
         dec_o = Variable(torch.zeros(batch_size, self.vocab_size))
         dec_o[:, SOS_TOKEN] = 1.0
