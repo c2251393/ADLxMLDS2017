@@ -153,12 +153,13 @@ class Decoder(nn.Module):
         if beam_search == -1:
             symbol_outs = []
             decoder_outs = []
+            use_teacher = target_outputs is not None and random.random() < sched_sampling_p
 
             # target_outputs: (batch x MAXLEN)
             for i in range(max_lens):
                 symbol_outs.append(symbol)
                 decoder_outs.append(dec_o)
-                if target_outputs is not None and random.random() < sched_sampling_p:
+                if use_teacher:
                     symbol = target_outputs[:,i]
                 dec_o, symbol, self.hc, context = decode(symbol, self.hc, context)
 

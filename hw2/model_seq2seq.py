@@ -99,6 +99,7 @@ if USE_CUDA:
 opt = torch.optim.Adam(model.parameters(), lr = args.lr)
 criterion = nn.CrossEntropyLoss()
 
+clip = 20.0
 
 def train(batch, sched_sampling_p=1):
     model.train()
@@ -138,6 +139,7 @@ def train(batch, sched_sampling_p=1):
     if USE_CUDA:
         loss = loss.cuda()
     loss.backward()
+    torch.nn.utils.clip_grad_norm(model.parameters(), clip)
     opt.step()
 
     return loss.data[0] / tot_len
