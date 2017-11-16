@@ -17,11 +17,12 @@ parser = argparse.ArgumentParser(description='')
 parser.add_argument('data', default='./data/',
                     help='data folder')
 parser.add_argument('-l', '--lr', type=float, default=float(0.001))
-parser.add_argument('-e', '--n_epoch', type=int, default=int(200))
+parser.add_argument('-e', '--n_epoch', type=int, default=int(300))
 parser.add_argument('-wx', '--window_size_x', type=int, default=int(3))
 parser.add_argument('-wy', '--window_size_y', type=int, default=int(2))
 parser.add_argument('-p', '--pool_size', type=int, default=int(2))
 parser.add_argument('-H', '--hidden_size', type=int, default=int(256))
+parser.add_argument('-E', '--embed_size', type=int, default=int(256))
 parser.add_argument('-b', '--batch_size', type=int, default=int(16))
 parser.add_argument('-n', '--n_layers', type=int, default=int(1))
 parser.add_argument('-d', '--dropout', type=float, default=int(0.0))
@@ -90,7 +91,7 @@ tr_loader = DataLoader(tr_data, batch_size=args.batch_size, shuffle=True)
 te_data = MSVD_te(args.data)
 te_loader = DataLoader(te_data, batch_size=args.batch_size, shuffle=True)
 
-model = model.S2S(args.hidden_size, EMBED_SIZE, args.dropout, args.attn)
+model = model.S2S(args.hidden_size, args.embed_size, args.n_layers, args.dropout, args.attn)
 if USE_CUDA:
     model.cuda()
 
@@ -214,4 +215,4 @@ def main():
             fp.close()
             torch.save(model.state_dict(), os.path.join("models", model_name))
 
-# main()
+main()

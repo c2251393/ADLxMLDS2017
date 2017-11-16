@@ -14,7 +14,6 @@ import numpy as np
 
 MAXLEN = 50
 MAX_N_CAP = 40
-EMBED_SIZE = 256
 USE_CUDA = torch.cuda.is_available()
 PAD_TOKEN = 0
 SOS_TOKEN = 1

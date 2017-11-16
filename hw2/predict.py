@@ -27,6 +27,7 @@ parser.add_argument('-wx', '--window_size_x', type=int, default=int(3))
 parser.add_argument('-wy', '--window_size_y', type=int, default=int(2))
 parser.add_argument('-p', '--pool_size', type=int, default=int(2))
 parser.add_argument('-H', '--hidden_size', type=int, default=int(256))
+parser.add_argument('-E', '--embed_size', type=int, default=int(256))
 parser.add_argument('-b', '--batch_size', type=int, default=int(16))
 parser.add_argument('-n', '--n_layers', type=int, default=int(1))
 parser.add_argument('-d', '--dropout', type=float, default=int(0.0))
@@ -119,7 +120,7 @@ if args.peer_o != 'nan':
     peer_loader = DataLoader(te_data, batch_size=1, shuffle=True)
 
 
-model = model.S2S(args.hidden_size, EMBED_SIZE, args.dropout, args.attn)
+model = model.S2S(args.hidden_size, args.embed_size, args.n_layers, args.dropout, args.attn)
 if USE_CUDA:
     model.cuda()
 

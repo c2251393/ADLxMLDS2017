@@ -9,15 +9,17 @@ import random
 class Encoder(nn.Module):
     def __init__(self,
                  hidden_size,
+                 n_layers,
                  dropout
                  ):
         super(Encoder, self).__init__()
         self.input_size = 4096
         self.hidden_size = hidden_size
+        self.n_layers = n_layers
         self.dropout = dropout
         self.rnn = nn.LSTM(self.input_size,
                            self.hidden_size,
-                           1,
+                           self.n_layers,
                            dropout=self.dropout,
                            batch_first=True)
         self.hc = None
@@ -30,12 +32,12 @@ class Encoder(nn.Module):
         # target_lengths: (batch)
         output, self.hc = self.rnn(input, self.hc)
         # output: (batch x len x hidden)
-        # hc:     (batch x 1 x hidden)^2
+        # hc:     (batch x layer x hidden)^2
         return output, self.hc
 
     def init_hidden(self, batch_size):
-        h0 = Variable(torch.zeros(1, batch_size, self.hidden_size))
-        c0 = Variable(torch.zeros(1, batch_size, self.hidden_size))
+        h0 = Variable(torch.zeros(self.n_layers, batch_size, self.hidden_size))
+        c0 = Variable(torch.zeros(self.n_layers, batch_size, self.hidden_size))
         if USE_CUDA:
             h0 = h0.cuda()
             c0 = c0.cuda()
@@ -71,6 +73,7 @@ class Decoder(nn.Module):
     def __init__(self,
                  hidden_size,
                  embed_size,
+                 n_layers,
                  dropout,
                  do_attn=True
                  ):
@@ -79,6 +82,7 @@ class Decoder(nn.Module):
         self.vocab_size = len(lang.word2id)
         self.embed_size = embed_size
         self.hidden_size = hidden_size
+        self.n_layers = n_layers
         self.dropout = dropout
 
         if do_attn:
@@ -89,7 +93,7 @@ class Decoder(nn.Module):
             self.concat = None
         self.rnn = nn.LSTM(self.hidden_size + self.embed_size,
                            self.hidden_size,
-                           1,
+                           self.n_layers,
                            dropout=self.dropout,
                            batch_first=True)
         self.embed = nn.Embedding(self.vocab_size, self.embed_size)
@@ -204,6 +208,7 @@ class S2S(nn.Module):
     def __init__(self,
                  hidden_size=256,
                  embed_size=256,
+                 n_layers=1,
                  dropout=0,
                  do_attn=True
                  ):
@@ -212,10 +217,11 @@ class S2S(nn.Module):
         self.vocab_size = len(lang.word2id)
         self.hidden_size = hidden_size
         self.embed_size = embed_size
+        self.n_layers = n_layers
         self.dropout = dropout
 
-        self.encoder = Encoder(self.hidden_size, self.dropout)
-        self.decoder = Decoder(self.hidden_size, self.embed_size, self.dropout, do_attn)
+        self.encoder = Encoder(self.hidden_size, self.n_layers, self.dropout)
+        self.decoder = Decoder(self.hidden_size, self.embed_size, self.n_layers, self.dropout, do_attn)
 
     def forward(self, input, target_outputs, target_lengths,
                 sched_sampling_p=1,
