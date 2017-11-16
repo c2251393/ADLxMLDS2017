@@ -214,7 +214,7 @@ class S2S(nn.Module):
                  ):
         super(S2S, self).__init__()
         self.input_size = 4096
-        self.vocab_size = len(lang.word2id)
+        self.vocab_size = VOCAB
         self.hidden_size = hidden_size
         self.embed_size = embed_size
         self.n_layers = n_layers

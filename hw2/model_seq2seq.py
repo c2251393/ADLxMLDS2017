@@ -16,7 +16,7 @@ import model
 parser = argparse.ArgumentParser(description='')
 parser.add_argument('data', default='./data/',
                     help='data folder')
-parser.add_argument('-l', '--lr', type=float, default=float(0.001))
+parser.add_argument('-l', '--lr', type=float, default=float(0.0001))
 parser.add_argument('-e', '--n_epoch', type=int, default=int(300))
 parser.add_argument('-wx', '--window_size_x', type=int, default=int(3))
 parser.add_argument('-wy', '--window_size_y', type=int, default=int(2))
@@ -84,6 +84,7 @@ class MSVD_te(Dataset):
     def __getitem__(self, idx):
         return self.data[idx]
 
+lang.build(args.data)
 
 tr_data = MSVD_tr(args.data)
 tr_loader = DataLoader(tr_data, batch_size=args.batch_size, shuffle=True)
@@ -215,4 +216,4 @@ def main():
             fp.close()
             torch.save(model.state_dict(), os.path.join("models", model_name))
 
-main()
+# main()

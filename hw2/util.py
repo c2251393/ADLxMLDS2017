@@ -10,14 +10,31 @@ import random
 import time
 import math
 import numpy as np
+from collections import Counter
 
 
 MAXLEN = 50
 MAX_N_CAP = 40
+VOCAB = 3000
 USE_CUDA = torch.cuda.is_available()
 PAD_TOKEN = 0
 SOS_TOKEN = 1
 EOS_TOKEN = 2
+
+
+def parse(ss):
+    ss = ss.lower()
+    ss = ss.replace(',', '')
+    ss = ss.replace('.', '')
+    ss = ss.replace('\'', '')
+    ss = ss.replace('"', '')
+    ss = ss.replace('?', '')
+    ss = ss.replace('!', '')
+    ss = ss.replace('\n', '')
+    ss = ss.replace('/', '')
+    ss = ss.replace('\\', '')
+    return ss.split()
+
 
 class LANG():
     def __init__(self):
@@ -25,27 +42,33 @@ class LANG():
         self.id2word = {0: "PAD", 1: "SOS", "EOS": 2}
 
     def index_words(self, ss):
-        ss = ss.lower()
-        ss = ss.replace(',', '')
-        ss = ss.replace('.', '')
-        ss = ss.replace('\'', '')
-        ss = ss.replace('"', '')
-        ss = ss.replace('?', '')
-        ss = ss.replace('!', '')
-        ss = ss.replace('\n', '')
-        ss = ss.replace('/', '')
-        ss = ss.replace('\\', '')
         res = []
-        for s in ss.split():
+        for s in parse(ss):
             res.append(self.index_word(s))
         return res
 
     def index_word(self, s):
         if s in self.word2id:
             return self.word2id[s]
-        self.word2id[s] = len(self.word2id)
-        self.id2word[self.word2id[s]] = s
-        return self.word2id[s]
+        return self.word2id["LESS"]
+
+    def build(self, dir):
+        data = json.load(open(os.path.join(dir, "training_label.json")))
+        data.extend(json.load(open(os.path.join(dir, "testing_label.json"))))
+
+        all_words = []
+        for x in data:
+            caps = x['caption']
+            for ss in caps:
+                all_words.extend(parse(ss))
+
+        cnter = Counter(all_words)
+        all_words = [k for (k, cnt) in cnter.most_common(VOCAB)]
+        all_words.append("LESS")
+        for w in all_words:
+            self.word2id[w] = len(self.word2id)
+            self.id2word[self.word2id[w]] = w
+
 
     def tran(self, ss, to_len=-1):
         res = self.index_words(ss)

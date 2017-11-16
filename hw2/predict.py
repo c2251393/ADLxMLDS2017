@@ -109,15 +109,23 @@ class MSVD_te(Dataset):
     def __getitem__(self, idx):
         return self.data[idx]
 
+lang.build(args.data)
+
 tr_data = MSVD_tr(args.data)
 tr_loader = DataLoader(tr_data, batch_size=args.batch_size, shuffle=True)
 
 te_data = MSVD_te(args.data)
-te_loader = DataLoader(te_data, batch_size=1, shuffle=True)
+if args.beam_search == -1:
+    te_loader = DataLoader(te_data, batch_size=args.batch_size, shuffle=True)
+else:
+    te_loader = DataLoader(te_data, batch_size=1, shuffle=True)
 
 if args.peer_o != 'nan':
     peer_data = MSVD_peer(args.data)
-    peer_loader = DataLoader(te_data, batch_size=1, shuffle=True)
+    if args.beam_search == -1:
+        peer_loader = DataLoader(te_data, batch_size=args.batch_size, shuffle=True)
+    else:
+        peer_loader = DataLoader(te_data, batch_size=1, shuffle=True)
 
 
 model = model.S2S(args.hidden_size, args.embed_size, args.n_layers, args.dropout, args.attn)
