@@ -143,14 +143,21 @@ def test(batch):
 
     encoder_outputs, hidden = encoder(X)
 
-    decoder_outs, symbol_outs = decoder(encoder_outputs,
-                                        hidden,
-                                        None,
-                                        Variable(torch.LongTensor([MAXLEN])),
-                                        1,
-                                        args.beam_search)
+    decoder_input = Variable(torch.LongTensor([SOS_TOKEN] * batch_size))
+    decoder_context = Variable(torch.zeros(batch_size, 1, args.hidden_size))
+    if USE_CUDA:
+        decoder_input = decoder_input.cuda()
+        decoder_context = decoder_context.cuda()
+    output_symbols = []
 
-    return symbol_outs
+    for i in range(1, MAXLEN):
+        decoder_output, decoder_input, hidden, decoder_context = decoder(
+            decoder_input, hidden, decoder_context, encoder_outputs)
+        output_symbols.append(decoder_input)
+
+    output_symbols = torch.stack(output_symbols, 1)
+
+    return output_symbols
 
 test_ans = {}
 peer_ans = {}
