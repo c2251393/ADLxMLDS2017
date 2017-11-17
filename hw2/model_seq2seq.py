@@ -100,7 +100,7 @@ decoder_opt = torch.optim.Adam(decoder.parameters(), lr=args.lr)
 criterion = nn.CrossEntropyLoss()
 
 
-def train(batch, sched_sampling_p=1):
+def do_batch(batch, sched_sampling_p=1, train=True):
     batch_size = len(batch['id'])
     caption = batch['caption']
     # caption: N_CAP * (batch, MAXLEN)
@@ -109,122 +109,48 @@ def train(batch, sched_sampling_p=1):
     cap_idxs = []
     for i in range(batch_size):
         good_idxs = [j for j in range(MAX_N_CAP) if cap_lens[j][i] > 0]
-        cap_idxs.append(random.sample(good_idxs, 5))
+        cap_idxs.append(random.sample(good_idxs, N_SAMPLE_CAP))
 
     X = Variable(batch['feat'])
-    target_outputs = Variable(torch.stack([
-        caption[cids[0]][i] for (i, cids) in enumerate(cap_idxs)]))
-    target_lengths = Variable(torch.LongTensor([
-        cap_lens[cids[0]][i] for (i, cids) in enumerate(cap_idxs)]))
+
+    target_outputs = []
+    for j in range(N_SAMPLE_CAP):
+        tmp = []
+        for i in range(batch_size):
+            tmp.append(caption[cap_idxs[i][j]][i])
+        tmp = torch.stack(tmp)
+        # tmp: (batch, MAXLEN)
+        target_outputs.append(tmp)
+    target_outputs = Variable(torch.stack(target_outputs))
+    # target_outputs: (N_CAP, batch, MAXLEN)
+    target_outputs = target_outputs.transpose(1, 2)
+    # target_outputs: (N_CAP, MAXLEN, batch)
+
     if USE_CUDA:
         X = X.cuda()
         target_outputs = target_outputs.cuda()
-        target_lengths = target_lengths.cuda()
 
-    encoder.train()
-    decoder.train()
-    encoder_opt.zero_grad()
-    decoder_opt.zero_grad()
+    if train:
+        encoder.train()
+        decoder.train()
+        encoder_opt.zero_grad()
+        decoder_opt.zero_grad()
+    else:
+        encoder.eval()
+        decoder.eval()
 
     encoder_outputs, hidden = encoder(X)
 
-    use_teacher = random.random() < sched_sampling_p
+    use_teacher = train and random.random() < sched_sampling_p
 
-    decoder_input = target_outputs[0]
+    decoder_input = target_outputs[0][0]
     decoder_context = Variable(torch.zeros(batch_size, 1, args.hidden_size))
     if USE_CUDA:
         decoder_input = decoder_input.cuda()
         decoder_context = decoder_context.cuda()
 
     loss = 0
-    tot_len = 0
-    for b in range(batch_size):
-        cids = cap_idxs[b]
-        for j in range(len(cids)):
-            tlen = cap_lens[cids[j]][b]
-            tot_len += tlen
-
-    # decoder_outputs = []
-    # output_symbols = []
-
-    for i in range(1, MAXLEN):
-        decoder_output, decoder_input, hidden, decoder_context = decoder(
-            decoder_input, hidden, decoder_context, encoder_outputs)
-
-        for b in range(batch_size):
-            cids = cap_idxs[b]
-            for j in range(len(cids)):
-                tlen = cap_lens[cids[j]][b]
-                if i >= tlen: continue
-                target_symbol = Variable(torch.Tensor([caption[cids[j]][b][i]]))
-                if USE_CUDA:
-                    target_symbol = target_symbol.cuda()
-                loss += criterion(decoder_output[b], target_symbol)
-
-        # decoder_outputs.append(decoder_output)
-        # output_symbols.append(decoder_input)
-
-        if use_teacher:
-            decoder_input = target_outputs[i]
-
-    # decoder_outputs = torch.stack(decoder_outputs, 1)
-    # output_symbols = torch.stack(output_symbols, 1)
-
-    # for i in range(batch_size):
-        # cids = cap_idxs[i]
-        # for j in range(len(cids)):
-            # tlen = cap_lens[cids[j]][i]
-            # tot_len += tlen
-            # sent = Variable(caption[cids[j]][i][:tlen])
-            # if USE_CUDA:
-                # sent = sent.cuda()
-            # loss += criterion(decoder_outs[i][:tlen], sent)
-
-    if USE_CUDA:
-        loss = loss.cuda()
-    loss.backward()
-    encoder_opt.step()
-    decoder_opt.step()
-
-    return loss.data[0] / tot_len
-
-
-def eval(batch):
-    batch_size = len(batch['id'])
-
-    X = Variable(batch['feat'])
-    cap_idxs = [[] for i in range(batch_size)]
-    for i in range(batch_size):
-        good_idxs = [j for j in range(MAX_N_CAP) if batch['cap_lens'][j][i] > 0]
-        cap_idxs[i] = random.sample(good_idxs, 5)
-
-    target_outputs = Variable(torch.stack([
-        batch['caption'][cids[0]][i] for (i, cids) in enumerate(cap_idxs)]))
-    target_lengths = Variable(torch.LongTensor([
-        batch['cap_lens'][cids[0]][i] for (i, cids) in enumerate(cap_idxs)]))
-    if USE_CUDA:
-        X = X.cuda()
-        target_outputs = target_outputs.cuda()
-        target_lengths = target_lengths.cuda()
-
-    encoder.eval()
-    decoder.eval()
-
-    encoder_outputs, hidden = encoder(X)
-
-    decoder_input = target_outputs[0]
-    decoder_context = Variable(torch.zeros(batch_size, 1, args.hidden_size))
-    if USE_CUDA:
-        decoder_input = decoder_input.cuda()
-        decoder_context = decoder_context.cuda()
-
-    loss = 0
-    tot_len = 0
-    for b in range(batch_size):
-        cids = cap_idxs[b]
-        for j in range(len(cids)):
-            tlen = cap_lens[cids[j]][b]
-            tot_len += tlen
+    tot_len = MAXLEN * N_SAMPLE_CAP * batch_size
 
     # decoder_outputs = []
     output_symbols = []
@@ -233,21 +159,24 @@ def eval(batch):
         decoder_output, decoder_input, hidden, decoder_context = decoder(
             decoder_input, hidden, decoder_context, encoder_outputs)
 
-        for b in range(batch_size):
-            cids = cap_idxs[b]
-            for j in range(len(cids)):
-                tlen = cap_lens[cids[j]][b]
-                if i >= tlen: continue
-                target_symbol = Variable(torch.Tensor([caption[cids[j]][b][i]]))
-                if USE_CUDA:
-                    target_symbol = target_symbol.cuda()
-                loss += criterion(decoder_output[b], target_symbol)
+        for j in range(N_SAMPLE_CAP):
+            loss += criterion(decoder_output, target_outputs[j][i])
 
         # decoder_outputs.append(decoder_output)
         output_symbols.append(decoder_input)
 
+        if use_teacher:
+            decoder_input = target_outputs[0][i]
+
     # decoder_outputs = torch.stack(decoder_outputs, 1)
     output_symbols = torch.stack(output_symbols, 1)
+
+    if train:
+        if USE_CUDA:
+            loss = loss.cuda()
+        loss.backward()
+        encoder_opt.step()
+        decoder_opt.step()
 
     return loss.data[0] / tot_len, output_symbols
 
@@ -265,13 +194,13 @@ def main():
             # k = 64
             # prob = k / (k + math.exp(iter / k))
         for (i, bat) in enumerate(tr_loader, 1):
-            loss = train(bat, prob)
+            loss, _ = do_batch(bat, prob, True)
             if i % 30 == 0:
                 print("%s %d/%d %.4f p=%.2f" % (time_since(start), i, len(tr_loader), loss, prob))
             iter += 1
 
         for (i, bat) in enumerate(te_loader, 1):
-            loss, symbol_outs = eval(bat)
+            loss, symbol_outs = do_batch(bat, 1, False)
             for (j, id) in enumerate(bat['id']):
                 test_ans[id] = lang.itran(symbol_outs.data[j])
 

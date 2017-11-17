@@ -15,6 +15,7 @@ from collections import Counter
 
 MAXLEN = 50
 MAX_N_CAP = 40
+N_SAMPLE_CAP = 5
 VOCAB = 3000
 USE_CUDA = torch.cuda.is_available()
 PAD_TOKEN = 0
