@@ -13,7 +13,7 @@ import numpy as np
 from collections import Counter
 
 
-MAXLEN = 50
+MAXLEN = 45
 MAX_N_CAP = 40
 N_SAMPLE_CAP = 5
 VOCAB = 3000
@@ -90,7 +90,7 @@ class LANG():
                 if len(tokens) == 0 or word != tokens[-1]:
                     tokens.append(word)
         res = ' '.join(tokens)
-        res = res[0].upper() + res[1:] + '.'
+        # res = res[0].upper() + res[1:] + '.'
         return res
     
     def one_hot_word(self, s):

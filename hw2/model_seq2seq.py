@@ -114,17 +114,20 @@ def do_batch(batch, sched_sampling_p=1, train=True):
     X = Variable(batch['feat'])
 
     target_outputs = []
+    target_lengths = []
     for j in range(N_SAMPLE_CAP):
         tmp = []
+        tmp_lens = []
         for i in range(batch_size):
             tmp.append(caption[cap_idxs[i][j]][i])
+            tmp_lens.append(cap_lens[cap_idxs[i][j]][i])
         tmp = torch.stack(tmp)
         # tmp: (batch, MAXLEN)
         target_outputs.append(tmp)
+        target_lengths.append(tmp_lens)
     target_outputs = Variable(torch.stack(target_outputs))
     # target_outputs: (N_CAP, batch, MAXLEN)
-    target_outputs = target_outputs.transpose(1, 2)
-    # target_outputs: (N_CAP, MAXLEN, batch)
+    # target_length: [N_CAP, batch]
 
     if USE_CUDA:
         X = X.cuda()
@@ -152,24 +155,26 @@ def do_batch(batch, sched_sampling_p=1, train=True):
     loss = 0
     tot_len = MAXLEN * N_SAMPLE_CAP * batch_size
 
-    # decoder_outputs = []
+    decoder_outputs = []
     output_symbols = []
 
     for i in range(1, MAXLEN):
         decoder_output, decoder_input, hidden, decoder_context = decoder(
             decoder_input, hidden, decoder_context, encoder_outputs)
 
-        for j in range(N_SAMPLE_CAP):
-            loss += criterion(decoder_output, target_outputs[j][i])
-
-        # decoder_outputs.append(decoder_output)
+        decoder_outputs.append(decoder_output)
         output_symbols.append(decoder_input)
 
         if use_teacher:
-            decoder_input = target_outputs[0][i]
+            decoder_input = target_outputs[0, :, i]
 
-    # decoder_outputs = torch.stack(decoder_outputs, 1)
-    output_symbols = torch.stack(output_symbols, 1)
+    decoder_outputs = torch.stack(decoder_outputs, 1) #(batch, MAXLEN, VOCAB)
+    output_symbols = torch.stack(output_symbols, 1) #(batch, MAXLEN)
+
+    for j in range(N_SAMPLE_CAP):
+        for i in range(batch_size):
+            tlen = target_lengths[j][i]
+            loss += criterion(decoder_outputs[i][:tlen], target_outputs[j][i][:tlen])
 
     if train:
         if USE_CUDA:
@@ -214,11 +219,11 @@ def main():
                                                              epoch,
                                                              args.sample)
 
+        fp = open(model_name + ".ans", 'w')
+        for (k, v) in test_ans.items():
+            fp.write("%s,%s\n" % (k, v))
+        fp.close()
         if epoch % 20 == 0:
-            fp = open(model_name + ".ans", 'w')
-            for (k, v) in test_ans.items():
-                fp.write("%s,%s\n" % (k, v))
-            fp.close()
             torch.save(
                 {
                     "encoder": encoder.state_dict(),
