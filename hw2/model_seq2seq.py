@@ -178,7 +178,7 @@ def do_batch(batch, sched_sampling_p=1, train=True):
     for j in range(N_SAMPLE_CAP):
         for i in range(batch_size):
             tlen = target_lengths[j][i]
-            loss += criterion(decoder_outputs[i][:tlen], target_outputs[j][i][:tlen])
+            loss += criterion(decoder_outputs[i][:tlen-1], target_outputs[j][i][1:tlen])
 
     if train:
         if USE_CUDA:
