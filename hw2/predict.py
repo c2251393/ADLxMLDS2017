@@ -112,9 +112,9 @@ else:
 if args.peer_o != 'nan':
     peer_data = MSVD_peer(args.data)
     if args.beam_search == -1:
-        peer_loader = DataLoader(te_data, batch_size=args.batch_size, shuffle=True)
+        peer_loader = DataLoader(peer_data, batch_size=args.batch_size, shuffle=True)
     else:
-        peer_loader = DataLoader(te_data, batch_size=1, shuffle=True)
+        peer_loader = DataLoader(peer_data, batch_size=1, shuffle=True)
 
 
 state_dict = torch.load(os.path.join("models", args.model_file), map_location=lambda storage, location: storage)
