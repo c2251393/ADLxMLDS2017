@@ -146,14 +146,18 @@ def do_batch(batch, sched_sampling_p=1, train=True):
 
     use_teacher = train and random.random() < sched_sampling_p
 
-    decoder_input = target_outputs[0][0]
+    decoder_input = target_outputs[0, :, 0]
     decoder_context = Variable(torch.zeros(batch_size, 1, args.hidden_size))
     if USE_CUDA:
         decoder_input = decoder_input.cuda()
         decoder_context = decoder_context.cuda()
 
     loss = 0
-    tot_len = MAXLEN * N_SAMPLE_CAP * batch_size
+    tot_len = 0
+    for j in range(N_SAMPLE_CAP):
+        for i in range(batch_size):
+            tlen = target_lengths[j][i]
+            tot_len += tlen
 
     decoder_outputs = []
     output_symbols = []
