@@ -130,7 +130,7 @@ class Decoder(nn.Module):
             y, hidden = self.rnn(y, hidden)
             # y: (batch x 1 x hidden)
             c = prv_context
-            dec_o = self.W(yc)
+            dec_o = self.W(y)
             # dec_o: (batch x 1 x vocab_size)
 
         dec_symbol = dec_o.topk(1, 2)[1]

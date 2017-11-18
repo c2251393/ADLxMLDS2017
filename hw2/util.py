@@ -87,6 +87,8 @@ class LANG():
                 break
             if idx != SOS_TOKEN:
                 word = self.id2word[idx]
+                if word == "LESS":
+                    continue
                 if len(tokens) == 0 or word != tokens[-1]:
                     tokens.append(word)
         res = ' '.join(tokens)
