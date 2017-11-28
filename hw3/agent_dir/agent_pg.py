@@ -132,6 +132,8 @@ class Agent_PG(Agent):
         def finish_episode():
             R = 0
             for i in reversed(range(len(self.rewards))):
+                if abs(self.rewards[i]) > 0.0:
+                    R = 0
                 R = self.rewards[i] + self.gamma * R
                 self.rewards[i] = R
             rewards = torch.Tensor(self.rewards)
@@ -173,7 +175,7 @@ class Agent_PG(Agent):
                 if reward < 0:
                     b += 1
                 tot_reward += reward
-                if done or a >= 2 or b >= 2:
+                if done:
                     elen = t+1
                     break
 
