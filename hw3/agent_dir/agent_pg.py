@@ -207,16 +207,18 @@ class Agent_PG(Agent):
         ##################
         # return self.env.get_random_action()
         state = cu(Variable(torch.from_numpy(shrink(state)).float()))
+        y, self.hidden = self.model((state, self.hidden))
 
-        d_state = state - self.state
+        # d_state = state - self.state
 
-        y, self.hidden = self.model((d_state, self.hidden))
+        # y, self.hidden = self.model((d_state, self.hidden))
         prob = F.softmax(y)
         log_prob = F.log_softmax(y)
 
-        act = prob.multinomial().data
         if not test and self.warmup:
             act = torch.LongTensor([[self.env.get_random_action()]])
+        else:
+            act = prob.multinomial().data
         log_prob = log_prob.gather(1, cu(Variable(act)))
 
         if not test:
