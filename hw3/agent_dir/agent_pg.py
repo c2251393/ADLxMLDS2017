@@ -87,6 +87,7 @@ class Agent_PG(Agent):
         # YOUR CODE HERE #
         ##################
         self.n_episode = args.episode
+        self.n_warm = args.warm
         self.gamma = args.gamma
         self.episode_len = args.episode_len
 
@@ -98,12 +99,14 @@ class Agent_PG(Agent):
         self.rewards = []
 
         self.hidden = self.model.init_hidden()
+        self.warmup = True
 
         if args.test_pg:
             #you can load your model here
             print('loading trained model :%s.' % args.model)
             state_dict = torch.load(args.model, map_location=lambda storage, location: storage)
             self.model.load_state_dict(state_dict)
+            self.warmup = False
 
 
     def init_game_setting(self):
@@ -160,6 +163,8 @@ class Agent_PG(Agent):
 
         for episode in range(self.n_episode):
             print("Episode %d" % episode)
+            if episode > self.n_warm:
+                self.warmup = False
             self.init_game_setting()
             state = self.env.reset()
 
@@ -208,10 +213,10 @@ class Agent_PG(Agent):
         y, self.hidden = self.model((d_state, self.hidden))
         prob = F.softmax(y)
         log_prob = F.log_softmax(y)
-        # print(y)
-        # print(prob)
 
         act = prob.multinomial().data
+        if not test and self.warmup:
+            act = torch.LongTensor([[self.env.get_random_action()]])
         log_prob = log_prob.gather(1, cu(Variable(act)))
 
         if not test:
