@@ -10,6 +10,8 @@ import torch.nn.functional as F
 import torch.optim as optim
 import torch.autograd as autograd
 from torch.autograd import Variable
+from skimage.color import rgb2gray
+from cv2 import resize
 
 
 '''
@@ -22,22 +24,33 @@ When running pg:
         whether reach the end of the episode?
 '''
 
+def shrink(frame):
+    '''
+    frame: np.array
+        current RGB screen of game, shape: (210, 160, 3)
+    @output: gray scale np.array: (1, 80, 80)
+    '''
+    frame = frame[34: 34+160, :160]
+    frame = resize(rgb2gray(frame), (80, 80))
+    frame = np.reshape(frame, [1, 80, 80])
+    return frame
+
 
 class Model(nn.Module):
     def __init__(self):
         super(Model, self).__init__()
-        self.conv1 = nn.Conv2d(3, 32, 5, stride=1, padding=2)
-        self.maxp1 = nn.MaxPool2d(4, 4)
+        self.conv1 = nn.Conv2d(1, 32, 5, stride=1, padding=2)
+        self.maxp1 = nn.MaxPool2d(2, 2)
         self.conv2 = nn.Conv2d(32, 32, 5, stride=1, padding=1)
-        self.maxp2 = nn.MaxPool2d(3, 3)
+        self.maxp2 = nn.MaxPool2d(2, 2)
         self.conv3 = nn.Conv2d(32, 64, 4, stride=1, padding=1)
         self.maxp3 = nn.MaxPool2d(2, 2)
         self.conv4 = nn.Conv2d(64, 64, 3, stride=1, padding=1)
         self.maxp4 = nn.MaxPool2d(2, 2)
 
-        self.lstm = nn.LSTMCell(384, 256)
+        self.lstm = nn.LSTMCell(1024, 512)
 
-        self.W = nn.Linear(256, 6)
+        self.W = nn.Linear(512, 6)
         self.apply(weights_init)
         self.W.weight.data = norm_col_init(
             self.W.weight.data, 0.01)
@@ -49,7 +62,6 @@ class Model(nn.Module):
     def forward(self, x):
         x, hidden = x
         x = x.unsqueeze(0)
-        x = x.transpose(2, 3).transpose(1, 2)
         x = F.relu(self.maxp1(self.conv1(x)))
         x = F.relu(self.maxp2(self.conv2(x)))
         x = F.relu(self.maxp3(self.conv3(x)))
@@ -60,7 +72,7 @@ class Model(nn.Module):
         return self.W(hx), (hx, cx)
 
     def init_hidden(self):
-        return cu(Variable(torch.zeros(1, 256))), cu(Variable(torch.zeros(1, 256)))
+        return cu(Variable(torch.zeros(1, 512))), cu(Variable(torch.zeros(1, 512)))
 
 
 class Agent_PG(Agent):
@@ -81,7 +93,7 @@ class Agent_PG(Agent):
         self.model = Model()
         self.opt = optim.Adam(self.model.parameters(), lr=args.learning_rate)
 
-        self.state = cu(Variable(torch.zeros(210, 160, 3).float()))
+        self.state = cu(Variable(torch.zeros(1, 80, 80).float()))
         self.log_probs = []
         self.rewards = []
 
@@ -104,7 +116,7 @@ class Agent_PG(Agent):
         ##################
         # YOUR CODE HERE #
         ##################
-        self.state = cu(Variable(torch.zeros(210, 160, 3).float()))
+        self.state = cu(Variable(torch.zeros(1, 80, 80).float()))
         self.hidden = self.model.init_hidden()
 
 
@@ -146,8 +158,7 @@ class Agent_PG(Agent):
 
         for episode in range(self.n_episode):
             print("Episode %d" % episode)
-            self.state = cu(Variable(torch.zeros(210, 160, 3).float()))
-            self.hidden = self.model.init_hidden()
+            self.init_game_setting()
             state = self.env.reset()
 
             tot_reward = 0
@@ -162,7 +173,7 @@ class Agent_PG(Agent):
                 if reward < 0:
                     b += 1
                 tot_reward += reward
-                if done or a >= 3 or b >= 3:
+                if done or a >= 2 or b >= 2:
                     elen = t+1
                     break
 
@@ -187,17 +198,22 @@ class Agent_PG(Agent):
         ##################
         # YOUR CODE HERE #
         ##################
-        state = cu(Variable(torch.from_numpy(state).float()))
+        # return self.env.get_random_action()
+        state = cu(Variable(torch.from_numpy(shrink(state)).float()))
+
         d_state = state - self.state
 
         y, self.hidden = self.model((d_state, self.hidden))
         prob = F.softmax(y)
         log_prob = F.log_softmax(y)
+        # print(y)
+        # print(prob)
 
         act = prob.multinomial().data
         log_prob = log_prob.gather(1, cu(Variable(act)))
 
-        self.log_probs.append(log_prob)
+        if not test:
+            self.log_probs.append(log_prob)
         self.state = state
         return act[0, 0]
 
