@@ -121,10 +121,15 @@ class Agent_PG(Agent):
             self.prv_state = cu(Variable(torch.zeros(210, 160, 3).float()))
             state = self.env.reset()
             tot_reward = 0
+            a, b = 0, 0
             for t in range(10000):
                 action = self.make_action(state, test=False)
                 state, reward, done, info = self.env.step(action[0, 0])
                 self.model.rewards.append(reward)
+                if reward > 0:
+                    a += 1
+                if reward < 0:
+                    b += 1
                 tot_reward += reward
                 # if t % 100 == 0:
                     # print(tot_reward)
@@ -132,7 +137,7 @@ class Agent_PG(Agent):
                 if done or abs(tot_reward) >= 3:
                     break
 
-            print(tot_reward)
+            print(tot_reward, a, b)
             print(time_since(start))
             finish_episode()
             torch.save(self.model.state_dict(), "agent_pg.pt")
