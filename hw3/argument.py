@@ -10,5 +10,7 @@ def add_arguments(parser):
     parser.add_argument('--batch_size', type=int, default=32, help='batch size for training (default: 32)')
     parser.add_argument('--learning_rate', type=float, default=0.01, help='learning rate for training (default: 0.01)')
     parser.add_argument('--gamma', type=float, default=0.99, help='discount factor (default: 0.99)')
-    parser.add_argument('--episode', type=int, default=1000, help='episode count (default: 1000)')
+    parser.add_argument('--episode', type=int, default=10000, help='episode count (default: 10000)')
+    parser.add_argument('--episode_len', type=int, default=10000, help='episode length (default: 10000)')
+    parser.add_argument('--model', type=str, default='', help='model file')
     return parser

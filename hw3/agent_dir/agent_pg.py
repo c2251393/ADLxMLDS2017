@@ -26,27 +26,41 @@ When running pg:
 class Model(nn.Module):
     def __init__(self):
         super(Model, self).__init__()
-
-        self.conv1 = nn.Conv2d(3, 16, 5, stride=1, padding=2)
-        self.maxp1 = nn.MaxPool2d(3, 3)
-        self.conv2 = nn.Conv2d(16, 8, 5, stride=1, padding=1)
+        self.conv1 = nn.Conv2d(3, 32, 5, stride=1, padding=2)
+        self.maxp1 = nn.MaxPool2d(4, 4)
+        self.conv2 = nn.Conv2d(32, 32, 5, stride=1, padding=1)
         self.maxp2 = nn.MaxPool2d(3, 3)
-        self.conv3 = nn.Conv2d(8, 4, 4, stride=1, padding=1)
-        self.maxp3 = nn.MaxPool2d(3, 3)
+        self.conv3 = nn.Conv2d(32, 64, 4, stride=1, padding=1)
+        self.maxp3 = nn.MaxPool2d(2, 2)
+        self.conv4 = nn.Conv2d(64, 64, 3, stride=1, padding=1)
+        self.maxp4 = nn.MaxPool2d(2, 2)
 
-        self.W = nn.Linear(140, 6)
-        self.saved_actions = []
-        self.rewards = []
+        self.lstm = nn.LSTMCell(384, 256)
+
+        self.W = nn.Linear(256, 6)
+        self.apply(weights_init)
+        self.W.weight.data = norm_col_init(
+            self.W.weight.data, 0.01)
+        self.W.bias.data.fill_(0)
+
+        self.lstm.bias_ih.data.fill_(0)
+        self.lstm.bias_hh.data.fill_(0)
 
     def forward(self, x):
+        x, hidden = x
         x = x.unsqueeze(0)
         x = x.transpose(2, 3).transpose(1, 2)
         x = F.relu(self.maxp1(self.conv1(x)))
         x = F.relu(self.maxp2(self.conv2(x)))
         x = F.relu(self.maxp3(self.conv3(x)))
-        x = x.view(1, -1)
-        x = self.W(x)
-        return F.softmax(x)
+        x = F.relu(self.maxp4(self.conv4(x)))
+        x = x.view(x.size(0), -1)
+        # print(hidden[0].size(), hidden[1].size())
+        hx, cx = self.lstm(x, hidden)
+        return self.W(hx), (hx, cx)
+
+    def init_hidden(self):
+        return cu(Variable(torch.zeros(1, 256))), cu(Variable(torch.zeros(1, 256)))
 
 
 class Agent_PG(Agent):
@@ -55,21 +69,29 @@ class Agent_PG(Agent):
         Initialize every things you need here.
         For example: building your model
         """
-
         super(Agent_PG,self).__init__(env)
-        self.model = Model()
-        self.opt = optim.Adam(self.model.parameters(), lr=args.learning_rate)
-        self.n_episode = args.episode
-        self.gamma = args.gamma
-        self.prv_state = cu(Variable(torch.zeros(210, 160, 3).float()))
-
-        if args.test_pg:
-            #you can load your model here
-            print('loading trained model')
 
         ##################
         # YOUR CODE HERE #
         ##################
+        self.n_episode = args.episode
+        self.gamma = args.gamma
+        self.episode_len = args.episode_len
+
+        self.model = Model()
+        self.opt = optim.Adam(self.model.parameters(), lr=args.learning_rate)
+
+        self.state = cu(Variable(torch.zeros(210, 160, 3).float()))
+        self.log_probs = []
+        self.rewards = []
+
+        self.hidden = self.model.init_hidden()
+
+        if args.test_pg:
+            #you can load your model here
+            print('loading trained model :%s.' % args.model)
+            state_dict = torch.load(args.model, map_location=lambda storage, location: storage)
+            self.model.load_state_dict(state_dict)
 
 
     def init_game_setting(self):
@@ -82,7 +104,8 @@ class Agent_PG(Agent):
         ##################
         # YOUR CODE HERE #
         ##################
-        self.prv_state = cu(Variable(torch.zeros(210, 160, 3).float()))
+        self.state = cu(Variable(torch.zeros(210, 160, 3).float()))
+        self.hidden = self.model.init_hidden()
 
 
     def train(self):
@@ -96,21 +119,26 @@ class Agent_PG(Agent):
 
         def finish_episode():
             R = 0
-            rewards = []
-            for r in self.model.rewards[::-1]:
-                R = r + self.gamma * R
-                rewards.insert(0, R)
-            print(R)
-            rewards = torch.Tensor(rewards)
-            for (act, r) in zip(self.model.saved_actions, rewards):
-                act.reinforce(r)
-            self.opt.zero_grad()
-            autograd.backward(self.model.saved_actions, [None for _ in self.model.saved_actions])
-            self.opt.step()
-            print(time_since(start))
+            for i in reversed(range(len(self.rewards))):
+                R = self.rewards[i] + self.gamma * R
+                self.rewards[i] = R
+            rewards = torch.Tensor(self.rewards)
+            rewards = (rewards - rewards.mean()) / (rewards.std() + np.finfo(np.float32).eps)
 
-            del self.model.saved_actions[:]
-            del self.model.rewards[:]
+            policy_loss = 0.0
+            for (log_prob, r) in zip(self.log_probs, rewards):
+                policy_loss = policy_loss - log_prob * r
+
+            print("Policy loss: ", policy_loss.data[0, 0])
+
+            self.opt.zero_grad()
+            policy_loss = cu(policy_loss)
+            policy_loss.backward()
+            torch.nn.utils.clip_grad_norm(self.model.parameters(), 40)
+            self.opt.step()
+
+            print(time_since(start))
+            self.clear_action()
 
         self.model.train()
         if USE_CUDA:
@@ -118,14 +146,16 @@ class Agent_PG(Agent):
 
         for episode in range(self.n_episode):
             print("Episode %d" % episode)
-            self.prv_state = cu(Variable(torch.zeros(210, 160, 3).float()))
+            self.state = cu(Variable(torch.zeros(210, 160, 3).float()))
+            self.hidden = self.model.init_hidden()
             state = self.env.reset()
+
             tot_reward = 0
             a, b = 0, 0
-            for t in range(10000):
+            for t in range(self.episode_len):
                 action = self.make_action(state, test=False)
                 state, reward, done, info = self.env.step(action[0, 0])
-                self.model.rewards.append(reward)
+                self.rewards.append(reward)
                 if reward > 0:
                     a += 1
                 if reward < 0:
@@ -134,7 +164,7 @@ class Agent_PG(Agent):
                 # if t % 100 == 0:
                     # print(tot_reward)
                     # print(time_since(start))
-                if done or abs(tot_reward) >= 3:
+                if done or a >= 3 or b >= 3:
                     break
 
             print(tot_reward, a, b)
@@ -143,7 +173,7 @@ class Agent_PG(Agent):
             torch.save(self.model.state_dict(), "agent_pg.pt")
 
 
-    def make_action(self, observation, test=True):
+    def make_action(self, state, test=True):
         """
         Return predicted action of your agent
 
@@ -158,10 +188,20 @@ class Agent_PG(Agent):
         ##################
         # YOUR CODE HERE #
         ##################
-        # return self.env.get_random_action()
-        state = cu(Variable(torch.from_numpy(observation).float()))
-        prob = self.model(state - self.prv_state)
-        act = prob.multinomial()
-        self.model.saved_actions.append(act)
-        self.prv_state = state
-        return act.data
+        state = cu(Variable(torch.from_numpy(state).float()))
+        d_state = state - self.state
+
+        y, self.hidden = self.model((d_state, self.hidden))
+        prob = F.softmax(y)
+        log_prob = F.log_softmax(y)
+
+        act = prob.multinomial().data
+        log_prob = log_prob.gather(1, cu(Variable(act)))
+
+        self.log_probs.append(log_prob)
+        self.state = state
+        return act
+
+    def clear_action(self):
+        del self.log_probs[:]
+        del self.rewards[:]
