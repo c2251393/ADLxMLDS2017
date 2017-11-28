@@ -227,5 +227,5 @@ class Agent_PG(Agent):
         return act[0, 0]
 
     def clear_action(self):
-        del self.log_probs[:]
-        del self.rewards[:]
+        self.log_probs = []
+        self.rewards = []
