@@ -132,6 +132,8 @@ class Agent_PG(Agent):
                 if done or abs(tot_reward) >= 3:
                     break
 
+            print(tot_reward)
+            print(time_since(start))
             finish_episode()
             torch.save(self.model.state_dict(), "agent_pg.pt")
 
