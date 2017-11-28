@@ -62,7 +62,7 @@ class Agent_PG(Agent):
         self.opt = optim.Adam(self.model.parameters(), lr=args.learning_rate)
         self.n_episode = args.episode
         self.gamma = args.gamma
-        self.prv_state = Variable(torch.zeros(210, 160, 3).float())
+        self.prv_state = cu(Variable(torch.zeros(210, 160, 3).float()))
 
         if args.test_pg:
             #you can load your model here
@@ -83,7 +83,7 @@ class Agent_PG(Agent):
         ##################
         # YOUR CODE HERE #
         ##################
-        self.prv_state = Variable(torch.zeros(210, 160, 3).float())
+        self.prv_state = cu(Variable(torch.zeros(210, 160, 3).float()))
 
 
     def train(self):
@@ -102,11 +102,9 @@ class Agent_PG(Agent):
                 R = r + self.gamma * R
                 rewards.insert(0, R)
             print(R)
-
             rewards = torch.Tensor(rewards)
             for (act, r) in zip(self.model.saved_actions, rewards):
                 act.reinforce(r)
-
             self.opt.zero_grad()
             autograd.backward(self.model.saved_actions, [None for _ in self.model.saved_actions])
             self.opt.step()
@@ -116,12 +114,14 @@ class Agent_PG(Agent):
             del self.model.rewards[:]
 
         self.model.train()
+        if USE_CUDA:
+            self.model.cuda()
 
         for episode in range(self.n_episode):
             print("Episode %d" % episode)
             state = self.env.reset()
             tot_reward = 0
-            for t in range(100):
+            for t in range(10000):
                 action = self.make_action(state, test=False)
                 state, reward, done, info = self.env.step(action[0, 0])
                 self.model.rewards.append(reward)
@@ -152,7 +152,7 @@ class Agent_PG(Agent):
         # YOUR CODE HERE #
         ##################
         # return self.env.get_random_action()
-        state = Variable(torch.from_numpy(observation).float())
+        state = cu(Variable(torch.from_numpy(observation).float()))
         prob = self.model(state - self.prv_state)
         act = prob.multinomial()
         self.model.saved_actions.append(act)
