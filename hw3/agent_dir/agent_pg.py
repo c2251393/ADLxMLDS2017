@@ -27,14 +27,14 @@ class Model(nn.Module):
     def __init__(self):
         super(Model, self).__init__()
 
-        self.conv1 = nn.Conv2d(3, 32, 5, stride=1, padding=2)
-        self.maxp1 = nn.MaxPool2d(4, 4)
-        self.conv2 = nn.Conv2d(32, 16, 5, stride=1, padding=1)
-        self.maxp2 = nn.MaxPool2d(4, 4)
-        self.conv3 = nn.Conv2d(16, 8, 4, stride=1, padding=1)
-        self.maxp3 = nn.MaxPool2d(2, 2)
+        self.conv1 = nn.Conv2d(3, 16, 5, stride=1, padding=2)
+        self.maxp1 = nn.MaxPool2d(3, 3)
+        self.conv2 = nn.Conv2d(16, 8, 5, stride=1, padding=1)
+        self.maxp2 = nn.MaxPool2d(3, 3)
+        self.conv3 = nn.Conv2d(8, 4, 4, stride=1, padding=1)
+        self.maxp3 = nn.MaxPool2d(3, 3)
 
-        self.W = nn.Linear(160, 6)
+        self.W = nn.Linear(140, 6)
         self.saved_actions = []
         self.rewards = []
 
@@ -44,7 +44,6 @@ class Model(nn.Module):
         x = F.relu(self.maxp1(self.conv1(x)))
         x = F.relu(self.maxp2(self.conv2(x)))
         x = F.relu(self.maxp3(self.conv3(x)))
-        # print(x.size())
         x = x.view(1, -1)
         x = self.W(x)
         return F.softmax(x)
