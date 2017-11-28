@@ -128,7 +128,7 @@ class Agent_PG(Agent):
                 if t % 100 == 0:
                     print(tot_reward)
                     print(time_since(start))
-                if done:
+                if done or abs(tot_reward) > 3:
                     break
 
             finish_episode()
