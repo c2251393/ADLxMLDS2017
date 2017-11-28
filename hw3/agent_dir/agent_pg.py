@@ -118,6 +118,7 @@ class Agent_PG(Agent):
 
         for episode in range(self.n_episode):
             print("Episode %d" % episode)
+            self.prv_state = cu(Variable(torch.zeros(210, 160, 3).float()))
             state = self.env.reset()
             tot_reward = 0
             for t in range(10000):
@@ -125,10 +126,10 @@ class Agent_PG(Agent):
                 state, reward, done, info = self.env.step(action[0, 0])
                 self.model.rewards.append(reward)
                 tot_reward += reward
-                if t % 100 == 0:
-                    print(tot_reward)
-                    print(time_since(start))
-                if done or abs(tot_reward) > 3:
+                # if t % 100 == 0:
+                    # print(tot_reward)
+                    # print(time_since(start))
+                if done or abs(tot_reward) >= 3:
                     break
 
             finish_episode()
