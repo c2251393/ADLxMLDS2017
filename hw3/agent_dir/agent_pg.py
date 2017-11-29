@@ -58,9 +58,10 @@ class Model(nn.Module):
 
         self.lstm.bias_ih.data.fill_(0)
         self.lstm.bias_hh.data.fill_(0)
+        self.hidden = cu(Variable(torch.zeros(1, 512))), cu(Variable(torch.zeros(1, 512)))
 
     def forward(self, x):
-        x, hidden = x
+        x = x
         x = x.unsqueeze(0)
         x = F.relu(self.maxp1(self.conv1(x)))
         x = F.relu(self.maxp2(self.conv2(x)))
@@ -68,11 +69,12 @@ class Model(nn.Module):
         x = F.relu(self.maxp4(self.conv4(x)))
         x = x.view(x.size(0), -1)
         # print(hidden[0].size(), hidden[1].size())
-        hx, cx = self.lstm(x, hidden)
-        return self.W(hx), (hx, cx)
+        hx, cx = self.lstm(x, self.hidden)
+        self.hidden = (hx, cx)
+        return self.W(hx)
 
     def init_hidden(self):
-        return cu(Variable(torch.zeros(1, 512))), cu(Variable(torch.zeros(1, 512)))
+        self.hidden = cu(Variable(torch.zeros(1, 512))), cu(Variable(torch.zeros(1, 512)))
 
 
 class Agent_PG(Agent):
@@ -98,7 +100,6 @@ class Agent_PG(Agent):
         self.log_probs = []
         self.rewards = []
 
-        self.hidden = self.model.init_hidden()
         self.warmup = True
 
         if args.test_pg:
@@ -120,7 +121,7 @@ class Agent_PG(Agent):
         # YOUR CODE HERE #
         ##################
         self.state = cu(Variable(torch.zeros(1, 80, 80).float()))
-        self.hidden = self.model.init_hidden()
+        self.model.init_hidden()
 
 
     def train(self):
@@ -206,12 +207,9 @@ class Agent_PG(Agent):
         # YOUR CODE HERE #
         ##################
         # return self.env.get_random_action()
-        state = cu(Variable(torch.from_numpy(shrink(state)).float()))
-        y, self.hidden = self.model((state, self.hidden))
+        state = torch.from_numpy(shrink(state)).float()
+        y = self.model(cu(Variable(state)))
 
-        # d_state = state - self.state
-
-        # y, self.hidden = self.model((d_state, self.hidden))
         prob = F.softmax(y)
         log_prob = F.log_softmax(y)
 
