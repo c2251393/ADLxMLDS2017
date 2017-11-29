@@ -13,40 +13,35 @@ When running dqn:
         whether reach the end of the episode?
 '''
 
-EPS_START = 0.9
-EPS_END = 0.05
+EPS_START = 1.0
+EPS_END = 0.1
 EPS_DECAY = 500
 
 
 class Model(nn.Module):
     def __init__(self):
         super(Model, self).__init__()
-        self.conv1 = nn.Conv2d(4, 32, 5, stride=1, padding=2)
-        self.maxp1 = nn.MaxPool2d(2, 2)
-        self.conv2 = nn.Conv2d(32, 32, 5, stride=1, padding=1)
-        self.maxp2 = nn.MaxPool2d(2, 2)
-        self.conv3 = nn.Conv2d(32, 64, 4, stride=1, padding=1)
-        self.maxp3 = nn.MaxPool2d(2, 2)
-        self.conv4 = nn.Conv2d(64, 64, 3, stride=1, padding=1)
-        self.maxp4 = nn.MaxPool2d(2, 2)
+        self.conv1 = nn.Conv2d(4, 16, 8, stride=4)
+        self.conv2 = nn.Conv2d(16, 32, 4, stride=2)
 
-        self.W1 = nn.Linear(1024, 512)
-        self.W2 = nn.Linear(512, 4)
-        self.apply(weights_init)
-        self.W1.weight.data = norm_col_init(
-            self.W1.weight.data, 0.01)
-        self.W1.bias.data.fill_(0)
-        self.W2.weight.data = norm_col_init(
-            self.W2.weight.data, 0.01)
-        self.W2.bias.data.fill_(0)
+        self.W1 = nn.Linear(2592, 256)
+        self.W2 = nn.Linear(256, 4)
+        # self.apply(weights_init)
+        # self.W1.weight.data = norm_col_init(
+            # self.W1.weight.data, 0.01)
+        # self.W1.bias.data.fill_(0)
+        # self.W2.weight.data = norm_col_init(
+            # self.W2.weight.data, 0.01)
+        # self.W2.bias.data.fill_(0)
 
     def forward(self, x):
+        # (B, 84, 84, 4)
         x = x.transpose(2, 3).transpose(1, 2)
-        x = F.relu(self.maxp1(self.conv1(x)))
-        x = F.relu(self.maxp2(self.conv2(x)))
-        x = F.relu(self.maxp3(self.conv3(x)))
-        x = F.relu(self.maxp4(self.conv4(x)))
+        # (B, 4, 84, 84)
+        x = F.relu(self.conv1(x))
+        x = F.relu(self.conv2(x))
         x = x.view(x.size(0), -1)
+        # print(x.size())
         x = F.relu(self.W1(x))
         x = self.W2(x)
         return x
@@ -92,7 +87,7 @@ class Agent_DQN(Agent):
         self.step_copy = args.step_copy
 
         self.model = Model()
-        self.target_model = Model()
+        # self.target_model = Model()
         self.opt = optim.Adam(self.model.parameters(), lr=args.learning_rate)
         self.memory = ReplayMemory(args.buffer_size)
 
@@ -132,10 +127,10 @@ class Agent_DQN(Agent):
         ##################
         start = time.time()
         self.model.train()
-        self.target_model.eval()
+        # self.target_model.eval()
         if USE_CUDA:
             self.model.cuda()
-            self.target_model.cuda()
+            # self.target_model.cuda()
 
         def optimize_model():
             if len(self.memory) < self.batch_size:
@@ -157,7 +152,7 @@ class Agent_DQN(Agent):
             state_action_values = self.model(state_batch).gather(1, action_batch)
             # (batch, 1)
             next_state_values = cu(Variable(torch.zeros(self.batch_size, 1)))
-            next_state_values[non_final_mask] = self.target_model(non_final_next_states).max(1)[0]
+            next_state_values[non_final_mask] = self.model(non_final_next_states).max(1)[0]
             next_state_values.volatile = False
 
             expected_state_action_values = (next_state_values * self.gamma) + reward_batch
@@ -165,11 +160,12 @@ class Agent_DQN(Agent):
             self.opt.zero_grad()
             loss.backward()
             self.opt.step()
-            if self.steps_done % self.step_copy == 0:
-                self.target_model.load_state_dict(self.model.state_dict())
+            # if self.steps_done % self.step_copy == 0:
+                # self.target_model.load_state_dict(self.model.state_dict())
             return loss.data[0]
 
         all_loss = []
+        running_reward = None
 
         for episode in range(self.n_episode):
             print("Episode %d" % episode)
@@ -195,9 +191,12 @@ class Agent_DQN(Agent):
 
                 if done:
                     break
+            if running_reward is None:
+                running_reward = tot_reward
+            else:
+                running_reward = 0.99 * running_reward + 0.01 * tot_reward
 
-            print(time_since(start), tot_reward, len(all_loss))
-            print(all_loss[-5:])
+            print(time_since(start), running_reward, self.steps_done)
             torch.save(self.model.state_dict(), "agent_dqn.pt")
 
 
@@ -217,8 +216,11 @@ class Agent_DQN(Agent):
         # YOUR CODE HERE #
         ##################
         sample = random.random()
-        eps_threshold = EPS_END + (EPS_START - EPS_END) * \
-                        math.exp(-1. * self.steps_done / EPS_DECAY)
+        if self.steps_done > 1e6:
+            eps_threshold = 0.1
+        else:
+            eps_threshold = EPS_END + (EPS_START - EPS_END) * \
+                            (1 - self.steps_done / 1e6)
         self.steps_done += 1
         # print(eps_threshold)
         if sample > eps_threshold:
