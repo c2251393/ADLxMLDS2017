@@ -1,17 +1,6 @@
 from agent_dir.agent import Agent
 
-import numpy as np
-from itertools import count
 from utils import *
-
-import torch
-import torch.nn as nn
-import torch.nn.functional as F
-import torch.optim as optim
-import torch.autograd as autograd
-from torch.autograd import Variable
-from skimage.color import rgb2gray
-from cv2 import resize
 
 
 '''
@@ -61,7 +50,6 @@ class Model(nn.Module):
         self.hidden = cu(Variable(torch.zeros(1, 512))), cu(Variable(torch.zeros(1, 512)))
 
     def forward(self, x):
-        x = x
         x = x.unsqueeze(0)
         x = F.relu(self.maxp1(self.conv1(x)))
         x = F.relu(self.maxp2(self.conv2(x)))
