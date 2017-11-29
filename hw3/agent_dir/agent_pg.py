@@ -120,7 +120,7 @@ class Agent_PG(Agent):
         ##################
         # YOUR CODE HERE #
         ##################
-        self.state = cu(Variable(torch.zeros(1, 80, 80).float()))
+        self.state = torch.zeros(1, 80, 80).float()
         self.model.init_hidden()
 
 
@@ -181,6 +181,8 @@ class Agent_PG(Agent):
                 if reward < 0:
                     b += 1
                 tot_reward += reward
+                if abs(reward) > 0:
+                    finish_episode()
                 if done:
                     elen = t+1
                     break
@@ -209,6 +211,7 @@ class Agent_PG(Agent):
         # return self.env.get_random_action()
         state = torch.from_numpy(shrink(state)).float()
         y = self.model(cu(Variable(state)))
+        self.state = state
 
         prob = F.softmax(y)
         log_prob = F.log_softmax(y)
@@ -221,9 +224,10 @@ class Agent_PG(Agent):
 
         if not test:
             self.log_probs.append(log_prob)
-        self.state = state
         return act[0, 0]
 
     def clear_action(self):
         self.log_probs = []
         self.rewards = []
+        hx, cx = self.model.hidden
+        self.model.hidden = cu(Variable(hx.data)), cu(Variable(cx.data))
