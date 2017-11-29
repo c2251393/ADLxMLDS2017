@@ -89,8 +89,10 @@ class Agent_DQN(Agent):
         self.gamma = args.gamma
         self.episode_len = args.episode_len
         self.batch_size = args.batch_size
+        self.step_copy = args.step_copy
 
         self.model = Model()
+        self.target_model = Model()
         self.opt = optim.Adam(self.model.parameters(), lr=args.learning_rate)
         self.memory = ReplayMemory(args.buffer_size)
 
@@ -100,8 +102,8 @@ class Agent_DQN(Agent):
         if args.test_dqn:
             #you can load your model here
             print('loading trained model')
-            # state_dict = torch.load(args.model, map_location=lambda storage, location: storage)
-            # self.model.load_state_dict(state_dict)
+            state_dict = torch.load(args.model, map_location=lambda storage, location: storage)
+            self.model.load_state_dict(state_dict)
 
         ##################
         # YOUR CODE HERE #
@@ -130,8 +132,10 @@ class Agent_DQN(Agent):
         ##################
         start = time.time()
         self.model.train()
+        self.target_model.eval()
         if USE_CUDA:
             self.model.cuda()
+            self.target_model.cuda()
 
         def optimize_model():
             if len(self.memory) < self.batch_size:
@@ -153,7 +157,7 @@ class Agent_DQN(Agent):
             state_action_values = self.model(state_batch).gather(1, action_batch)
             # (batch, 1)
             next_state_values = cu(Variable(torch.zeros(self.batch_size, 1)))
-            next_state_values[non_final_mask] = self.model(non_final_next_states).max(1)[0]
+            next_state_values[non_final_mask] = self.target_model(non_final_next_states).max(1)[0]
             next_state_values.volatile = False
 
             expected_state_action_values = (next_state_values * self.gamma) + reward_batch
@@ -161,6 +165,8 @@ class Agent_DQN(Agent):
             self.opt.zero_grad()
             loss.backward()
             self.opt.step()
+            if self.steps_done % self.step_copy == 0:
+                self.target_model.load_state_dict(self.model.state_dict())
             return loss.data[0]
 
         all_loss = []
@@ -184,12 +190,13 @@ class Agent_DQN(Agent):
                 state = next_state
 
                 loss = optimize_model()
+                # print(loss)
                 all_loss.append(loss)
 
                 if done:
                     break
 
-            print(time_since(start), tot_reward)
+            print(time_since(start), tot_reward, len(all_loss))
             print(all_loss[-5:])
             torch.save(self.model.state_dict(), "agent_dqn.pt")
 
