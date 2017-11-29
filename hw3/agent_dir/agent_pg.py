@@ -147,16 +147,16 @@ class Agent_PG(Agent):
             for (log_prob, r) in zip(self.log_probs, rewards):
                 policy_loss = policy_loss - log_prob * r
 
-            print("Policy loss: ", policy_loss.data[0, 0])
+            loss = policy_loss.data[0, 0]
 
             self.opt.zero_grad()
             policy_loss = cu(policy_loss)
             policy_loss.backward()
-            torch.nn.utils.clip_grad_norm(self.model.parameters(), 40)
+            # torch.nn.utils.clip_grad_norm(self.model.parameters(), 40)
             self.opt.step()
 
-            print(time_since(start))
             self.clear_action()
+            return loss
 
         self.model.train()
         if USE_CUDA:
@@ -172,6 +172,7 @@ class Agent_PG(Agent):
             tot_reward = 0
             a, b = 0, 0
             elen = 0
+            loss = 0
             for t in range(self.episode_len):
                 action = self.make_action(state, test=False)
                 state, reward, done, info = self.env.step(action)
@@ -182,12 +183,13 @@ class Agent_PG(Agent):
                     b += 1
                 tot_reward += reward
                 if abs(reward) > 0:
-                    finish_episode()
+                    loss = finish_episode()
                 if done:
                     elen = t+1
                     break
 
             print(tot_reward, a, b, elen)
+            print(loss)
             print(time_since(start))
             torch.save(self.model.state_dict(), "agent_pg.pt")
 
