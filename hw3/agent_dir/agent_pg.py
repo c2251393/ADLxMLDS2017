@@ -111,11 +111,12 @@ class Agent_PG(Agent):
                 self.rewards[i] = R
             rewards = torch.Tensor(self.rewards)
             rewards = (rewards - rewards.mean()) / (rewards.std() + np.finfo(np.float32).eps)
-            self.log_probs = torch.stack(self.log_probs).view(-1)
+            
+            policy_loss = 0.0
+            for (log_prob, r) in zip(self.log_probs, rewards):
+                policy_loss -= log_prob * r
 
-            policy_loss = self.log_probs.dot(cu(Variable(rewards)))
-
-            loss = policy_loss.data[0]
+            loss = policy_loss.data[0, 0]
 
             self.opt.zero_grad()
             policy_loss = cu(policy_loss)
