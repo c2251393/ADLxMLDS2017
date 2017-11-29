@@ -139,8 +139,8 @@ class Agent_DQN(Agent):
             transitions = self.memory.sample(self.batch_size)
             batch = Transition(*zip(*transitions))
             # print(batch)
-            non_final_mask = torch.ByteTensor(tuple(map(lambda s: s is not None,
-                                                  batch.next_state)))
+            non_final_mask = cu(torch.ByteTensor(tuple(map(lambda s: s is not None,
+                                                  batch.next_state))))
             non_final_next_states = cu(Variable(
                 torch.stack([torch.from_numpy(s).float()
                              for s in batch.next_state if s is not None]), volatile=True))
@@ -152,7 +152,7 @@ class Agent_DQN(Agent):
             # (batch, 1)
             state_action_values = self.model(state_batch).gather(1, action_batch)
             # (batch, 1)
-            next_state_values = Variable(torch.zeros(self.batch_size, 1))
+            next_state_values = cu(Variable(torch.zeros(self.batch_size, 1)))
             next_state_values[non_final_mask] = self.model(non_final_next_states).max(1)[0]
             next_state_values.volatile = False
 
@@ -161,6 +161,9 @@ class Agent_DQN(Agent):
             self.opt.zero_grad()
             loss.backward()
             self.opt.step()
+            return loss.data[0]
+
+        all_loss = []
 
         for episode in range(self.n_episode):
             print("Episode %d" % episode)
@@ -180,12 +183,14 @@ class Agent_DQN(Agent):
 
                 state = next_state
 
-                optimize_model()
+                loss = optimize_model()
+                all_loss.append(loss)
 
                 if done:
                     break
 
             print(time_since(start), tot_reward)
+            print(all_loss[-5:])
             torch.save(self.model.state_dict(), "agent_dqn.pt")
 
 
