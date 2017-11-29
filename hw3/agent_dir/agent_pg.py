@@ -189,7 +189,6 @@ class Agent_PG(Agent):
 
             print(tot_reward, a, b, elen)
             print(time_since(start))
-            finish_episode()
             torch.save(self.model.state_dict(), "agent_pg.pt")
 
 
