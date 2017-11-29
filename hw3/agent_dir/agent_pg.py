@@ -28,12 +28,7 @@ def shrink(frame):
 class Model(nn.Module):
     def __init__(self):
         super(Model, self).__init__()
-        self.conv1 = nn.Conv2d(1, 16, 5, stride=1, padding=2)
-        self.maxp1 = nn.MaxPool2d(2, 2)
-        self.conv2 = nn.Conv2d(16, 4, 5, stride=1, padding=1)
-        self.maxp2 = nn.MaxPool2d(2, 2)
-
-        self.W1 = nn.Linear(1444, 512)
+        self.W1 = nn.Linear(80*80, 512)
         self.W2 = nn.Linear(512, 6)
         # self.apply(weights_init)
         # self.W.weight.data = norm_col_init(
@@ -45,11 +40,7 @@ class Model(nn.Module):
         # self.hidden = cu(Variable(torch.zeros(1, 512))), cu(Variable(torch.zeros(1, 512)))
 
     def forward(self, x):
-        x = x.unsqueeze(0)
-        x = F.relu(self.maxp1(self.conv1(x)))
-        x = F.relu(self.maxp2(self.conv2(x)))
         x = x.view(x.size(0), -1)
-        # print(x.size())
         x = F.relu(self.W1(x))
         x = F.relu(self.W2(x))
         return x
@@ -70,7 +61,7 @@ class Agent_PG(Agent):
         self.n_warm = args.warm
         self.gamma = args.gamma
         self.episode_len = args.episode_len
-        self.update_every = 10
+        self.update_every = 3
 
         self.model = Model()
         self.opt = optim.Adam(self.model.parameters(), lr=args.learning_rate)
@@ -100,7 +91,6 @@ class Agent_PG(Agent):
         # YOUR CODE HERE #
         ##################
         self.state = torch.zeros(1, 80, 80).float()
-        # self.model.init_hidden()
 
 
     def train(self):
@@ -131,7 +121,6 @@ class Agent_PG(Agent):
             self.opt.zero_grad()
             policy_loss = cu(policy_loss)
             policy_loss.backward()
-            # torch.nn.utils.clip_grad_norm(self.model.parameters(), 40)
             self.opt.step()
 
             self.clear_action()
@@ -140,6 +129,7 @@ class Agent_PG(Agent):
         self.model.train()
         if USE_CUDA:
             self.model.cuda()
+        running_reward = None
 
         for episode in range(1, self.n_episode+1):
             print("Episode %d" % episode)
@@ -166,14 +156,17 @@ class Agent_PG(Agent):
                 if done:
                     elen = t+1
                     break
+            if running_reward is None:
+               running_reward = tot_reward 
+            else:
+                running_reward = 0.99 * running_reward + 0.01 * tot_reward
 
             if episode % self.update_every == 0:
-                optimize_model()
+                loss = optimize_model()
+                print(running_reward, a, b, elen)
+                print(time_since(start))
+                torch.save(self.model.state_dict(), "agent_pg.pt")
 
-            print(tot_reward, a, b, elen)
-            print(loss)
-            print(time_since(start))
-            torch.save(self.model.state_dict(), "agent_pg.pt")
 
 
     def make_action(self, state, test=True):
