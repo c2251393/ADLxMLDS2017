@@ -19,7 +19,7 @@ def shrink(frame):
         current RGB screen of game, shape: (210, 160, 3)
     @output: gray scale np.array: (1, 80, 80)
     '''
-    frame = frame[34: 34+160, :160]
+    frame = frame[35: 35+160, :160]
     frame = resize(rgb2gray(frame), (80, 80))
     frame = np.reshape(frame, [1, 80, 80])
     return frame
@@ -28,41 +28,31 @@ def shrink(frame):
 class Model(nn.Module):
     def __init__(self):
         super(Model, self).__init__()
-        self.conv1 = nn.Conv2d(1, 32, 5, stride=1, padding=2)
+        self.conv1 = nn.Conv2d(1, 16, 5, stride=1, padding=2)
         self.maxp1 = nn.MaxPool2d(2, 2)
-        self.conv2 = nn.Conv2d(32, 32, 5, stride=1, padding=1)
+        self.conv2 = nn.Conv2d(16, 4, 5, stride=1, padding=1)
         self.maxp2 = nn.MaxPool2d(2, 2)
-        self.conv3 = nn.Conv2d(32, 64, 4, stride=1, padding=1)
-        self.maxp3 = nn.MaxPool2d(2, 2)
-        self.conv4 = nn.Conv2d(64, 64, 3, stride=1, padding=1)
-        self.maxp4 = nn.MaxPool2d(2, 2)
 
-        self.lstm = nn.LSTMCell(1024, 512)
+        self.W1 = nn.Linear(1444, 512)
+        self.W2 = nn.Linear(512, 6)
+        # self.apply(weights_init)
+        # self.W.weight.data = norm_col_init(
+            # self.W.weight.data, 0.01)
+        # self.W.bias.data.fill_(0)
 
-        self.W = nn.Linear(512, 6)
-        self.apply(weights_init)
-        self.W.weight.data = norm_col_init(
-            self.W.weight.data, 0.01)
-        self.W.bias.data.fill_(0)
-
-        self.lstm.bias_ih.data.fill_(0)
-        self.lstm.bias_hh.data.fill_(0)
-        self.hidden = cu(Variable(torch.zeros(1, 512))), cu(Variable(torch.zeros(1, 512)))
+        # self.lstm.bias_ih.data.fill_(0)
+        # self.lstm.bias_hh.data.fill_(0)
+        # self.hidden = cu(Variable(torch.zeros(1, 512))), cu(Variable(torch.zeros(1, 512)))
 
     def forward(self, x):
         x = x.unsqueeze(0)
         x = F.relu(self.maxp1(self.conv1(x)))
         x = F.relu(self.maxp2(self.conv2(x)))
-        x = F.relu(self.maxp3(self.conv3(x)))
-        x = F.relu(self.maxp4(self.conv4(x)))
         x = x.view(x.size(0), -1)
-        # print(hidden[0].size(), hidden[1].size())
-        hx, cx = self.lstm(x, self.hidden)
-        self.hidden = (hx, cx)
-        return self.W(hx)
-
-    def init_hidden(self):
-        self.hidden = cu(Variable(torch.zeros(1, 512))), cu(Variable(torch.zeros(1, 512)))
+        # print(x.size())
+        x = F.relu(self.W1(x))
+        x = F.relu(self.W2(x))
+        return x
 
 
 class Agent_PG(Agent):
@@ -80,6 +70,7 @@ class Agent_PG(Agent):
         self.n_warm = args.warm
         self.gamma = args.gamma
         self.episode_len = args.episode_len
+        self.update_every = 10
 
         self.model = Model()
         self.opt = optim.Adam(self.model.parameters(), lr=args.learning_rate)
@@ -109,7 +100,7 @@ class Agent_PG(Agent):
         # YOUR CODE HERE #
         ##################
         self.state = torch.zeros(1, 80, 80).float()
-        self.model.init_hidden()
+        # self.model.init_hidden()
 
 
     def train(self):
@@ -121,7 +112,7 @@ class Agent_PG(Agent):
         ##################
         start = time.time()
 
-        def finish_episode():
+        def optimize_model():
             R = 0
             for i in reversed(range(len(self.rewards))):
                 if abs(self.rewards[i]) > 0.0:
@@ -150,10 +141,10 @@ class Agent_PG(Agent):
         if USE_CUDA:
             self.model.cuda()
 
-        for episode in range(self.n_episode):
+        for episode in range(1, self.n_episode+1):
             print("Episode %d" % episode)
-            if episode > self.n_warm:
-                self.warmup = False
+            # if episode > self.n_warm:
+                # self.warmup = False
             self.init_game_setting()
             state = self.env.reset()
 
@@ -170,11 +161,14 @@ class Agent_PG(Agent):
                 if reward < 0:
                     b += 1
                 tot_reward += reward
-                if abs(reward) > 0:
-                    loss = finish_episode()
+                # if abs(reward) > 0:
+                    # loss = optimize_model()
                 if done:
                     elen = t+1
                     break
+
+            if episode % self.update_every == 0:
+                optimize_model()
 
             print(tot_reward, a, b, elen)
             print(loss)
@@ -199,16 +193,13 @@ class Agent_PG(Agent):
         ##################
         # return self.env.get_random_action()
         state = torch.from_numpy(shrink(state)).float()
-        y = self.model(cu(Variable(state)))
+        d_state = state - self.state
+        y = self.model(cu(Variable(d_state)))
         self.state = state
 
         prob = F.softmax(y)
         log_prob = F.log_softmax(y)
-
-        if not test and self.warmup:
-            act = torch.LongTensor([[self.env.get_random_action()]])
-        else:
-            act = prob.multinomial().data
+        act = prob.multinomial().data
         log_prob = log_prob.gather(1, cu(Variable(act)))
 
         if not test:
@@ -218,5 +209,3 @@ class Agent_PG(Agent):
     def clear_action(self):
         self.log_probs = []
         self.rewards = []
-        hx, cx = self.model.hidden
-        self.model.hidden = cu(Variable(hx.data)), cu(Variable(cx.data))
