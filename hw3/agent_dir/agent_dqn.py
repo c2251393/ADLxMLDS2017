@@ -88,7 +88,7 @@ class Agent_DQN(Agent):
 
         self.model = Model()
         # self.target_model = Model()
-        self.opt = optim.Adam(self.model.parameters(), lr=args.learning_rate)
+        self.opt = optim.RMSprop(self.model.parameters(), lr=args.learning_rate, weight_decay=0.99)
         self.memory = ReplayMemory(args.buffer_size)
 
         self.state = cu(Variable(torch.zeros(84, 84, 4).float()))

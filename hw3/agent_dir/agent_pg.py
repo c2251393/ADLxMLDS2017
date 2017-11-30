@@ -28,6 +28,8 @@ def shrink(frame):
 class Model(nn.Module):
     def __init__(self):
         super(Model, self).__init__()
+        self.conv1 = nn.Conv2d(4, 16, 8, stride=4)
+        self.conv2 = nn.Conv2d(16, 32, 4, stride=2)
         self.W1 = nn.Linear(80*80, 512)
         self.W2 = nn.Linear(512, 6)
         # self.apply(weights_init)
@@ -44,6 +46,35 @@ class Model(nn.Module):
         x = F.relu(self.W1(x))
         x = F.relu(self.W2(x))
         return x
+
+
+
+class Model2(nn.Module):
+    def __init__(self):
+        super(Model2, self).__init__()
+        self.conv1 = nn.Conv2d(1, 16, 8, stride=4)
+        self.conv2 = nn.Conv2d(16, 32, 4, stride=2)
+
+        self.W1 = nn.Linear(2048, 256)
+        self.W2 = nn.Linear(256, 4)
+        # self.apply(weights_init)
+        # self.W.weight.data = norm_col_init(
+            # self.W.weight.data, 0.01)
+        # self.W.bias.data.fill_(0)
+
+        # self.lstm.bias_ih.data.fill_(0)
+        # self.lstm.bias_hh.data.fill_(0)
+        # self.hidden = cu(Variable(torch.zeros(1, 512))), cu(Variable(torch.zeros(1, 512)))
+
+    def forward(self, x):
+        x = x.unsqueeze(0)
+        x = F.relu(self.conv1(x))
+        x = F.relu(self.conv2(x))
+        x = x.view(x.size(0), -1)
+        x = F.relu(self.W1(x))
+        x = F.relu(self.W2(x))
+        return x
+
 
 
 class Agent_PG(Agent):
@@ -63,8 +94,8 @@ class Agent_PG(Agent):
         self.episode_len = args.episode_len
         self.update_every = 3
 
-        self.model = Model()
-        self.opt = optim.Adam(self.model.parameters(), lr=args.learning_rate)
+        self.model = Model2()
+        self.opt = optim.RMSprop(self.model.parameters(), lr=args.learning_rate, weight_decay=0.99)
 
         self.state = cu(Variable(torch.zeros(1, 80, 80).float()))
         self.log_probs = []
