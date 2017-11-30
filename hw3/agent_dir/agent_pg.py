@@ -95,7 +95,7 @@ class Agent_PG(Agent):
         self.update_every = 3
 
         self.model = Model2()
-        self.opt = optim.RMSprop(self.model.parameters(), lr=args.learning_rate, weight_decay=0.99)
+        self.opt = optim.Adam(self.model.parameters(), lr=args.learning_rate, weight_decay=0.99)
 
         self.state = cu(Variable(torch.zeros(1, 80, 80).float()))
         self.log_probs = []
@@ -174,9 +174,13 @@ class Agent_PG(Agent):
             elen = 0
             loss = 0
             for t in range(self.episode_len):
-                action = self.make_action(state, test=False)
+                if t % 4 == 0:
+                    action = self.make_action(state, test=False)
                 state, reward, done, info = self.env.step(action)
-                self.rewards.append(reward)
+                if t % 4 == 0:
+                    self.rewards.append(reward)
+                else:
+                    self.rewards[-1] += reward
                 if reward > 0:
                     a += 1
                 if reward < 0:
