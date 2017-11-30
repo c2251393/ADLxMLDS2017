@@ -22,4 +22,7 @@ def add_arguments(parser):
     parser.add_argument('--var_reduce', action='store_true', help='variance reduce')
     parser.add_argument('--off_policy', action='store_true', help='off policy learning')
     parser.add_argument('--gae', action='store_true', help='generalized advantage estimation')
+
+    parser.add_argument('--ddqn', action='store_true', help='Double DQN')
+    parser.add_argument('--duel', action='store_true', help='Duel DQN')
     return parser

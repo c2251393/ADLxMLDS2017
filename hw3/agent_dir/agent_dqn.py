@@ -19,14 +19,17 @@ EPS_DECAY = 500
 
 
 class Model(nn.Module):
-    def __init__(self):
+    def __init__(self, duel=False):
         super(Model, self).__init__()
+        self.duel = duel
         self.conv1 = nn.Conv2d(4, 32, 8, stride=4)
         self.conv2 = nn.Conv2d(32, 64, 4, stride=2)
         self.conv3 = nn.Conv2d(64, 64, 3, stride=1)
 
         self.W1 = nn.Linear(3136, 512)
         self.W2 = nn.Linear(512, 4)
+        if self.duel:
+            self.Wv = nn.Linear(512, 1)
         # self.apply(weights_init)
         # self.W1.weight.data = norm_col_init(
             # self.W1.weight.data, 0.01)
@@ -45,7 +48,13 @@ class Model(nn.Module):
         x = x.view(x.size(0), -1)
         # print(x.size())
         x = F.relu(self.W1(x))
-        x = self.W2(x)
+        if self.duel:
+            a = F.relu(self.W2(x))
+            v = F.relu(self.Wv(x))
+            am = a.mean(1).unsqueeze(1)
+            x = a + (v - am)
+        else:
+            x = self.W2(x)
         return x
 
 
@@ -87,8 +96,10 @@ class Agent_DQN(Agent):
         self.episode_len = args.episode_len
         self.batch_size = args.batch_size
         self.step_copy = args.step_copy
+        self.ddqn = args.ddqn
+        self.duel = args.duel
 
-        self.model = Model()
+        self.model = Model(self.duel)
         self.target_model = Model()
         self.opt = optim.Adam(self.model.parameters(), lr=args.learning_rate, weight_decay=0.99)
         self.memory = ReplayMemory(args.buffer_size)
@@ -155,7 +166,12 @@ class Agent_DQN(Agent):
             state_action_values = self.model(state_batch).gather(1, action_batch)
             # (batch, 1)
             next_state_values = cu(Variable(torch.zeros(self.batch_size, 1)))
-            next_state_values[non_final_mask] = self.target_model(non_final_next_states).max(1)[0]
+            if self.ddqn:
+                next_state_actions = self.model(non_final_next_states).max(1)[1]
+                next_state_values[non_final_mask] = self.target_model(non_final_next_states)[next_state_actions]
+            else:
+                next_state_values[non_final_mask] = self.target_model(non_final_next_states).max(1)[0]
+
             next_state_values.volatile = False
 
             expected_state_action_values = (next_state_values * self.gamma) + reward_batch
@@ -163,7 +179,7 @@ class Agent_DQN(Agent):
             self.opt.zero_grad()
             loss.backward()
             self.opt.step()
-            if self.steps_done % self.step_copy == 0:
+            if self.steps_done % (4*self.step_copy) == 0:
                 self.target_model.load_state_dict(self.model.state_dict())
             return loss.data[0]
 

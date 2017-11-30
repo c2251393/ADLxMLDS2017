@@ -28,9 +28,8 @@ def shrink(frame):
 class Model(nn.Module):
     def __init__(self):
         super(Model, self).__init__()
-        self.W1 = nn.Linear(80*80, 512)
-        self.W2 = nn.Linear(512, 256)
-        self.W3 = nn.Linear(256, 6)
+        self.W1 = nn.Linear(80*80, 200)
+        self.W2 = nn.Linear(200, 6)
         # self.apply(weights_init)
         # self.W.weight.data = norm_col_init(
             # self.W.weight.data, 0.01)
@@ -43,8 +42,7 @@ class Model(nn.Module):
     def forward(self, x):
         x = x.view(x.size(0), -1)
         x = F.relu(self.W1(x))
-        x = F.relu(self.W2(x))
-        x = F.relu(self.W3(x))
+        x = self.W2(x)
         return x
 
 
