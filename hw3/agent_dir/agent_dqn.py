@@ -168,7 +168,6 @@ class Agent_DQN(Agent):
         running_reward = None
 
         for episode in range(self.n_episode):
-            print("Episode %d" % episode)
             self.init_game_setting()
             state = self.env.reset()
 
@@ -196,7 +195,9 @@ class Agent_DQN(Agent):
             else:
                 running_reward = 0.99 * running_reward + 0.01 * tot_reward
 
-            print(time_since(start), running_reward, self.steps_done)
+            if episode % 100 == 0:
+                print("Episode %d" % episode)
+                print(time_since(start), running_reward, self.steps_done)
             torch.save(self.model.state_dict(), "agent_dqn.pt")
 
 
