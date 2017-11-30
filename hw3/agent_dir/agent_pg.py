@@ -28,8 +28,6 @@ def shrink(frame):
 class Model(nn.Module):
     def __init__(self):
         super(Model, self).__init__()
-        self.conv1 = nn.Conv2d(4, 16, 8, stride=4)
-        self.conv2 = nn.Conv2d(16, 32, 4, stride=2)
         self.W1 = nn.Linear(80*80, 512)
         self.W2 = nn.Linear(512, 6)
         # self.apply(weights_init)
@@ -142,7 +140,7 @@ class Agent_PG(Agent):
                 self.rewards[i] = R
             rewards = torch.Tensor(self.rewards)
             rewards = (rewards - rewards.mean()) / (rewards.std() + np.finfo(np.float32).eps)
-            
+
             policy_loss = 0.0
             for (log_prob, r) in zip(self.log_probs, rewards):
                 policy_loss -= log_prob * r
@@ -174,13 +172,9 @@ class Agent_PG(Agent):
             elen = 0
             loss = 0
             for t in range(self.episode_len):
-                if t % 4 == 0:
-                    action = self.make_action(state, test=False)
+                action = self.make_action(state, test=False)
                 state, reward, done, info = self.env.step(action)
-                if t % 4 == 0:
-                    self.rewards.append(reward)
-                else:
-                    self.rewards[-1] += reward
+                self.rewards.append(reward)
                 if reward > 0:
                     a += 1
                 if reward < 0:
@@ -192,7 +186,7 @@ class Agent_PG(Agent):
                     elen = t+1
                     break
             if running_reward is None:
-               running_reward = tot_reward 
+                running_reward = tot_reward
             else:
                 running_reward = 0.99 * running_reward + 0.01 * tot_reward
 
