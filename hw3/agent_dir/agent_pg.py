@@ -113,7 +113,7 @@ class Agent_PG(Agent):
         self.episode_len = args.episode_len
         self.var_reduce = args.var_reduce
         self.gae = args.gae
-        self.update_every = 3
+        self.update_every = 10
 
         if not self.gae:
             self.model = Model()
