@@ -90,7 +90,7 @@ class Agent_DQN(Agent):
 
         self.model = Model()
         self.target_model = Model()
-        self.opt = optim.RMSprop(self.model.parameters(), lr=args.learning_rate, weight_decay=0.99)
+        self.opt = optim.Adam(self.model.parameters(), lr=args.learning_rate, weight_decay=0.99)
         self.memory = ReplayMemory(args.buffer_size)
 
         self.state = cu(Variable(torch.zeros(84, 84, 4).float()))
@@ -231,7 +231,7 @@ class Agent_DQN(Agent):
                             (1 - self.steps_done / 1e6)
         self.steps_done += 4
         # print(eps_threshold)
-        if sample > eps_threshold:
+        if sample > eps_threshold or test:
             state = torch.from_numpy(state).float()
             y = self.model(cu(Variable(state.unsqueeze(0), volatile=True)))
             act = y.max(1)[1]
