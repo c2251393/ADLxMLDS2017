@@ -30,7 +30,7 @@ class Model(nn.Module):
         super(Model, self).__init__()
         self.W1 = nn.Linear(80*80, 256)
         self.W2 = nn.Linear(256, 6)
-        # self.apply(weights_init)
+        self.apply(weights_init)
         # self.W.weight.data = norm_col_init(
             # self.W.weight.data, 0.01)
         # self.W.bias.data.fill_(0)
@@ -72,12 +72,12 @@ class ModelGAE(nn.Module):
 class Model2(nn.Module):
     def __init__(self):
         super(Model2, self).__init__()
-        self.conv1 = nn.Conv2d(1, 16, 8, stride=4)
-        self.conv2 = nn.Conv2d(16, 32, 4, stride=2)
+        self.conv1 = nn.Conv2d(1, 32, 6, stride=3, padding=3)
 
-        self.W1 = nn.Linear(2048, 256)
-        self.W2 = nn.Linear(256, 4)
-        # self.apply(weights_init)
+        self.W1 = nn.Linear(23328, 64)
+        self.W2 = nn.Linear(64, 32)
+        self.W3 = nn.Linear(32, 4)
+        self.apply(weights_init)
         # self.W.weight.data = norm_col_init(
             # self.W.weight.data, 0.01)
         # self.W.bias.data.fill_(0)
@@ -89,10 +89,10 @@ class Model2(nn.Module):
     def forward(self, x):
         x = x.unsqueeze(0)
         x = F.relu(self.conv1(x))
-        x = F.relu(self.conv2(x))
         x = x.view(x.size(0), -1)
         x = F.relu(self.W1(x))
         x = F.relu(self.W2(x))
+        x = self.W3(x)
         return x
 
 
@@ -113,14 +113,14 @@ class Agent_PG(Agent):
         self.episode_len = args.episode_len
         self.var_reduce = args.var_reduce
         self.gae = args.gae
-        self.update_every = 10
+        self.update_every = 1
 
         if not self.gae:
-            self.model = Model()
+            self.model = Model2()
         else:
             self.model = ModelGAE()
 
-        self.opt = optim.Adam(self.model.parameters(), lr=args.learning_rate, weight_decay=0.99)
+        self.opt = optim.Adam(self.model.parameters(), lr=args.learning_rate)
 
         self.state = cu(Variable(torch.zeros(1, 80, 80).float()))
         self.log_probs = []
@@ -220,10 +220,10 @@ class Agent_PG(Agent):
                 running_reward = 0.99 * running_reward + 0.01 * tot_reward
 
             if episode % self.update_every == 0:
-                print("Episode %d" % episode)
                 loss = optimize_model()
-                print(running_reward, a, b, elen)
+                print("Episode %d" % episode)
                 print(time_since(start))
+                print("reward %.4f %d:%d len=%d" % (running_reward, a, b, elen))
                 torch.save(self.model.state_dict(), "agent_pg.pt")
 
     def train_gae(self):
@@ -236,10 +236,10 @@ class Agent_PG(Agent):
         def optimize_model():
             policy_loss = 0
             value_loss = 0
-            print(len(self.values))
+# print(len(self.values))
 
             R = cu(Variable(torch.zeros(1, 1)))
-            gae = torch.zeros(1, 1)
+            gae = cu(torch.zeros(1, 1))
 
             self.values.append(cu(Variable(torch.zeros(1, 1))))
 
@@ -296,10 +296,10 @@ class Agent_PG(Agent):
             else:
                 running_reward = 0.99 * running_reward + 0.01 * tot_reward
 
-            if episode % 1 == 0:
+            if episode % 100 == 0:
                 print("Episode %d" % episode)
-                print(running_reward, a, b, elen)
                 print(time_since(start))
+                print("%.4f %d:%d len=%d" % (running_reward, a, b, elen))
                 torch.save(self.model.state_dict(), "agent_pg.pt")
 
     def make_action(self, state, test=True):

@@ -229,7 +229,7 @@ class Agent_DQN(Agent):
             else:
                 running_reward = 0.99 * running_reward + 0.01 * tot_reward
 
-            if episode % 1 == 0:
+            if episode % 100 == 0:
                 print("Episode %d" % episode)
                 print(time_since(start),
                       running_reward, tot_reward,
