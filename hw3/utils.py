@@ -13,8 +13,6 @@ from utils import *
 from collections import namedtuple
 import random
 import math
-from skimage.color import rgb2gray
-from cv2 import resize
 import copy
 
 USE_CUDA = torch.cuda.is_available()

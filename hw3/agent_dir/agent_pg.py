@@ -13,16 +13,18 @@ When running pg:
         whether reach the end of the episode?
 '''
 
-def shrink(frame):
+def shrink(I):
     '''
     frame: np.array
         current RGB screen of game, shape: (210, 160, 3)
-    @output: gray scale np.array: (1, 80, 80)
+    @output: single color np.array: (1, 80, 80)
     '''
-    frame = frame[35: 35+160, :160]
-    frame = resize(rgb2gray(frame), (80, 80))
-    frame = np.reshape(frame, [1, 80, 80])
-    return frame
+    I = I[35:195]
+    I = I[::2, ::2, 0]
+    I[I == 144] = 0
+    I[I == 109] = 0
+    I[I != 0] = 1
+    return I.reshape(1, 80, 80)
 
 
 class Model(nn.Module):
