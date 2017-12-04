@@ -25,4 +25,6 @@ def add_arguments(parser):
 
     parser.add_argument('--ddqn', action='store_true', help='Double DQN')
     parser.add_argument('--duel', action='store_true', help='Duel DQN')
+
+    parser.add_argument('--clip', action='store_true', help='clip grad magnitude for DQN')
     return parser

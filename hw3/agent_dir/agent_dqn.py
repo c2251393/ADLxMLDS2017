@@ -15,7 +15,7 @@ When running dqn:
 
 EPS_START = 1.0
 EPS_END = 0.1
-EPS_DECAY = 500
+EPS_DECAY = 1000000
 
 
 class Model(nn.Module):
@@ -30,7 +30,7 @@ class Model(nn.Module):
         self.W2 = nn.Linear(512, 4)
         if self.duel:
             self.Wv = nn.Linear(512, 1)
-        # self.apply(weights_init)
+        self.apply(weights_init)
         # self.W1.weight.data = norm_col_init(
             # self.W1.weight.data, 0.01)
         # self.W1.bias.data.fill_(0)
@@ -43,8 +43,11 @@ class Model(nn.Module):
         x = x.transpose(2, 3).transpose(1, 2)
         # (B, 4, 84, 84)
         x = F.relu(self.conv1(x))
+        # print(x.size())
         x = F.relu(self.conv2(x))
+        # print(x.size())
         x = F.relu(self.conv3(x))
+        # print(x.size())
         x = x.view(x.size(0), -1)
         # print(x.size())
         x = F.relu(self.W1(x))
@@ -98,14 +101,17 @@ class Agent_DQN(Agent):
         self.step_copy = args.step_copy
         self.ddqn = args.ddqn
         self.duel = args.duel
+        self.clip = args.clip
+
+        self.frameskip = 1
 
         self.model = Model(self.duel)
         self.target_model = Model()
-        self.opt = optim.Adam(self.model.parameters(), lr=args.learning_rate, weight_decay=0.99)
+        self.opt = optim.Adam(self.model.parameters(), lr=args.learning_rate)
         self.memory = ReplayMemory(args.buffer_size)
 
-        self.state = cu(Variable(torch.zeros(84, 84, 4).float()))
         self.steps_done = 0
+        self.act_by_model = 0
 
         if args.test_dqn:
             #you can load your model here
@@ -128,7 +134,6 @@ class Agent_DQN(Agent):
         ##################
         # YOUR CODE HERE #
         ##################
-        self.state = torch.zeros(84, 84, 4).float()
 
 
     def train(self):
@@ -175,15 +180,19 @@ class Agent_DQN(Agent):
             next_state_values.volatile = False
 
             expected_state_action_values = (next_state_values * self.gamma) + reward_batch
-            loss = F.smooth_l1_loss(state_action_values, expected_state_action_values)
+            loss = (state_action_values - expected_state_action_values)
+            loss = sum(loss * loss)
+            # print(loss)
+            # loss = F.smooth_l1_loss(state_action_values, expected_state_action_values)
             self.opt.zero_grad()
             loss.backward()
+            if self.clip:
+                for param in self.model.parameters():
+                    param.grad.data.clamp_(-1, 1)
             self.opt.step()
-            if self.steps_done % (4*self.step_copy) == 0:
-                self.target_model.load_state_dict(self.model.state_dict())
+
             return loss.data[0]
 
-        all_loss = []
         running_reward = None
 
         for episode in range(self.n_episode):
@@ -193,8 +202,7 @@ class Agent_DQN(Agent):
             tot_reward = 0
 
             for t in range(self.episode_len):
-                if t % 4 == 0:
-                    action = self.make_action(state, test=False)
+                action = self.make_action(state, test=False)
                 next_state, reward, done, info = self.env.step(action)
                 tot_reward += reward
                 if done:
@@ -204,23 +212,28 @@ class Agent_DQN(Agent):
 
                 state = next_state
 
-                if t % 4 == 0:
+                if self.steps_done % 4 == 0:
                     loss = optimize_model()
-                    # print(loss)
-                    all_loss.append(loss)
+
+                if self.steps_done % self.step_copy == 0:
+                    # print("target_model update")
+                    self.target_model = copy.deepcopy(self.model)
+                    self.target_model.eval()
+                    # self.target_model.load_state_dict(self.model.state_dict())
 
                 if done:
                     break
+
             if running_reward is None:
                 running_reward = tot_reward
             else:
                 running_reward = 0.99 * running_reward + 0.01 * tot_reward
 
             if episode % 1 == 0:
-                eps_threshold = EPS_END + (EPS_START - EPS_END) * \
-                                (1 - self.steps_done / 1e6)
                 print("Episode %d" % episode)
-                print(time_since(start), running_reward, self.steps_done, eps_threshold)
+                print(time_since(start),
+                      running_reward, tot_reward,
+                      self.act_by_model, self.steps_done, loss)
             torch.save(self.model.state_dict(), "agent_dqn.pt")
 
 
@@ -240,16 +253,18 @@ class Agent_DQN(Agent):
         # YOUR CODE HERE #
         ##################
         sample = random.random()
-        if self.steps_done > 1e6:
+        if self.steps_done > EPS_DECAY:
             eps_threshold = 0.1
         else:
             eps_threshold = EPS_END + (EPS_START - EPS_END) * \
-                            (1 - self.steps_done / 1e6)
-        self.steps_done += 4
-        # print(eps_threshold)
+                            (1 - self.steps_done / EPS_DECAY)
+        self.steps_done += 1
         if sample > eps_threshold or test:
-            state = torch.from_numpy(state).float()
-            y = self.model(cu(Variable(state.unsqueeze(0), volatile=True)))
+            self.act_by_model += 1
+            state = torch.from_numpy(state).float().unsqueeze(0)
+            # state: (1, 84, 84, 4)
+            y = self.model(cu(Variable(state)))
+            # y: (1, 4)
             act = y.max(1)[1]
             return act.data[0]
         else:

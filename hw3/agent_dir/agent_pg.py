@@ -28,8 +28,8 @@ def shrink(frame):
 class Model(nn.Module):
     def __init__(self):
         super(Model, self).__init__()
-        self.W1 = nn.Linear(80*80, 200)
-        self.W2 = nn.Linear(200, 6)
+        self.W1 = nn.Linear(80*80, 256)
+        self.W2 = nn.Linear(256, 6)
         # self.apply(weights_init)
         # self.W.weight.data = norm_col_init(
             # self.W.weight.data, 0.01)
@@ -133,6 +133,8 @@ class Agent_PG(Agent):
             print('loading trained model :%s.' % args.model)
             state_dict = torch.load(args.model, map_location=lambda storage, location: storage)
             self.model.load_state_dict(state_dict)
+            if USE_CUDA:
+                self.model.cuda()
 
 
     def init_game_setting(self):
