@@ -110,6 +110,7 @@ class Agent_PG(Agent):
         ##################
         # YOUR CODE HERE #
         ##################
+        self.print_every = args.print_every
         self.n_episode = args.episode
         self.gamma = args.gamma
         self.episode_len = args.episode_len
