@@ -124,6 +124,8 @@ class Agent_DQN(Agent):
             print('loading trained model')
             state_dict = torch.load(args.model, map_location=lambda storage, location: storage)
             self.model.load_state_dict(state_dict)
+            if USE_CUDA:
+                self.model.cuda()
             self.test_step = 0
 
         ##################
