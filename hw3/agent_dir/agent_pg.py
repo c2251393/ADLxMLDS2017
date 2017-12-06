@@ -13,19 +13,24 @@ When running pg:
         whether reach the end of the episode?
 '''
 
-def shrink(I):
-    '''
-    frame: np.array
-        current RGB screen of game, shape: (210, 160, 3)
-    @output: single color np.array: (1, 80, 80)
-    '''
-    I = I[35:195]
-    I = I[::2, ::2, 0]
-    I[I == 144] = 0
-    I[I == 109] = 0
-    I[I != 0] = 1
-    return I.reshape(1, 80, 80)
+'''
+frame: np.array
+    current RGB screen of game, shape: (210, 160, 3)
+@output: single color np.array: (1, 80, 80)
+'''
+# def shrink(I):
+    # I = I[35:195]
+    # I = I[::2, ::2, 0]
+    # I[I == 144] = 0
+    # I[I == 109] = 0
+    # I[I != 0] = 1
+    # return I.reshape(1, 80, 80)
 
+def shrink(frame):
+    frame = frame[35: 35+160, :160]
+    frame = resize(rgb2gray(frame), (80, 80))
+    frame = np.reshape(frame, [1, 80, 80])
+    return frame
 
 class Model(nn.Module):
     def __init__(self):
@@ -114,7 +119,10 @@ class Agent_PG(Agent):
         self.max_step = args.step_train
 
         if not self.gae:
-            self.model = Model2()
+            if args.cnn:
+                self.model = Model2()
+            else:
+                self.model = Model()
         else:
             self.model = ModelGAE()
 
@@ -266,9 +274,37 @@ class Agent_PG(Agent):
 
         self.init_game_setting()
         state = self.env.reset()
+        tot_reward, a, b = 0, 0, 0
+
+        episode = 0
 
         for epoch in range(self.max_step):
-            pass
+            for step in range(self.step_upd):
+                action = self.make_action(state, test=False)
+                state, reward, done, info = self.env.step(action)
+                self.rewards.append(reward)
+                if reward > 0:
+                    a += 1
+                if reward < 0:
+                    b += 1
+                tot_reward += reward
+                if done:
+                    episode += 1
+                    if running_reward is None:
+                        running_reward = tot_reward
+                    else:
+                        running_reward = 0.99 * running_reward + 0.01 * tot_reward
+                    if episode % self.print_every == 0:
+                        print("Episode %d" % episode)
+                        print(time_since(start))
+                        print("%.4f %d:%d len=%d" % (running_reward, a, b, elen))
+
+                    self.init_game_setting()
+                    state = self.env.reset()
+                    tot_reward, a, b = 0, 0, 0
+
+            optimize_model()
+            torch.save(self.model.state_dict(), self.model_fn)
 
         for episode in range(1, self.n_episode+1):
             # if episode > self.n_warm:

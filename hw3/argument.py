@@ -22,6 +22,7 @@ def add_arguments(parser):
     parser.add_argument('--step_upd', type=int, default=4, help='step to update network (default: 4)')
     parser.add_argument('--step_train', type=int, default=1e7, help='total number of updates length (default: 1e7)')
 
+    parser.add_argument('--cnn', action='store_true', help='use cnn model')
     parser.add_argument('--update_every', type=int, default=10, help='step to update network in PG (default: 10)')
     parser.add_argument('--var_reduce', action='store_true', help='variance reduce')
     parser.add_argument('--gae', action='store_true', help='generalized advantage estimation')
