@@ -212,7 +212,7 @@ class Agent_DQN(Agent):
 
             tot_reward = 0
 
-            for t in range(self.episode_len):
+            for t in count(1):
                 if self.steps_done > self.max_step:
                     break
                 action = self.make_action(state, test=False)
@@ -244,10 +244,10 @@ class Agent_DQN(Agent):
             if episode % self.print_every == 0:
                 print("Episode %d" % episode)
                 print(time_since(start))
-                print("%.4f %d %d/%d" %
+                print("%.4f %d %d/%d len=%d" %
                       (running_reward,
                        tot_reward,
-                       self.act_by_model, self.steps_done))
+                       self.act_by_model, self.steps_done, t))
             torch.save(self.model.state_dict(), self.model_fn)
 
 
