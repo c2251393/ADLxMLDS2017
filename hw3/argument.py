@@ -20,7 +20,7 @@ def add_arguments(parser):
     parser.add_argument('--step_copy', type=int, default=1000, help='step to copy (default: 1000)')
     parser.add_argument('--step_learn', type=int, default=10000, help='learn until this many steps (default: 10000)')
     parser.add_argument('--step_upd', type=int, default=4, help='step to update network (default: 4)')
-    parser.add_argument('--step_train', type=int, default=1e7, help='total number of updates length (default: 1e7)')
+    parser.add_argument('--step_train', type=int, default=int(1e7), help='total number of updates length (default: 1e7)')
 
     parser.add_argument('--cnn', action='store_true', help='use cnn model')
     parser.add_argument('--update_every', type=int, default=10, help='step to update network in PG (default: 10)')

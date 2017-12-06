@@ -96,6 +96,25 @@ class Model2(nn.Module):
         return x
 
 
+class ModelGAE2(nn.Module):
+    def __init__(self):
+        super(ModelGAE2, self).__init__()
+        self.conv1 = nn.Conv2d(1, 16, 8, stride=4)
+        self.conv2 = nn.Conv2d(16, 32, 4, stride=2)
+
+        self.W1 = nn.Linear(2048, 256)
+        self.Wa = nn.Linear(256, 6)
+        self.Wv = nn.Linear(256, 1)
+        self.apply(weights_init)
+
+    def forward(self, x):
+        x = x.unsqueeze(0)
+        x = F.relu(self.conv1(x))
+        x = F.leaky_relu(self.conv2(x))
+        x = x.view(x.size(0), -1)
+        x = F.relu(self.W1(x))
+        return self.Wa(x), self.Wv(x)
+
 
 class Agent_PG(Agent):
     def __init__(self, env, args):
@@ -124,7 +143,10 @@ class Agent_PG(Agent):
             else:
                 self.model = Model()
         else:
-            self.model = ModelGAE()
+            if args.cnn:
+                self.model = ModelGAE2()
+            else:
+                self.model = ModelGAE()
 
         self.opt = optim.RMSprop(self.model.parameters(), lr=args.learning_rate)
 
@@ -255,8 +277,8 @@ class Agent_PG(Agent):
                 advantage = R - self.values[i]
                 value_loss = value_loss + 0.5 * advantage.pow(2)
 
-                delta_t = self.rewards[i] + self.gamma *\
-                          self.values[i+1].data - self.values[i].data
+                delta_t = self.rewards[i] + self.gamma * self.values[i+1].data \
+                            - self.values[i].data
                 gae = gae * self.gamma + delta_t
 
                 policy_loss = policy_loss - self.log_probs[i] * cu(Variable(gae))
@@ -297,7 +319,7 @@ class Agent_PG(Agent):
                     if episode % self.print_every == 0:
                         print("Episode %d" % episode)
                         print(time_since(start))
-                        print("%.4f %d:%d len=%d" % (running_reward, a, b, elen))
+                        print("%.4f %d:%d" % (running_reward, a, b))
 
                     self.init_game_setting()
                     state = self.env.reset()
@@ -305,43 +327,6 @@ class Agent_PG(Agent):
 
             optimize_model()
             torch.save(self.model.state_dict(), self.model_fn)
-
-        for episode in range(1, self.n_episode+1):
-            # if episode > self.n_warm:
-                # self.warmup = False
-            self.init_game_setting()
-            state = self.env.reset()
-
-            tot_reward = 0
-            a, b = 0, 0
-            elen = 0
-            loss = 0
-            for t in range(self.episode_len):
-                action = self.make_action(state, test=False)
-                state, reward, done, info = self.env.step(action)
-                self.rewards.append(reward)
-                if reward > 0:
-                    a += 1
-                if reward < 0:
-                    b += 1
-                tot_reward += reward
-                if (a+b > 0 and (a+b)%2 == 0 and reward != 0) or done:
-                    # print(a, b)
-                    loss = optimize_model()
-                if done:
-                    elen = t+1
-                    break
-
-            if running_reward is None:
-                running_reward = tot_reward
-            else:
-                running_reward = 0.99 * running_reward + 0.01 * tot_reward
-
-            if episode % self.print_every == 0:
-                print("Episode %d" % episode)
-                print(time_since(start))
-                print("%.4f %d:%d len=%d" % (running_reward, a, b, elen))
-                torch.save(self.model.state_dict(), self.model_fn)
 
     def make_action(self, state, test=True):
         """
