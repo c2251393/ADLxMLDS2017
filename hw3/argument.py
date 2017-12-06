@@ -13,7 +13,6 @@ def add_arguments(parser):
     parser.add_argument('--episode_len', type=int, default=10000, help='episode length (default: 10000)')
     parser.add_argument('--print_every', type=int, default=100, help='print progress every episode (default: 100)')
 
-    parser.add_argument('--warm', type=int, default=200, help='warmup length (default: 200)')
     parser.add_argument('--model', type=str, default='', help='model file')
 
     parser.add_argument('--batch_size', type=int, default=32, help='batch size for training (default: 32)')

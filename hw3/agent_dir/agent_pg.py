@@ -131,6 +131,10 @@ class Agent_PG(Agent):
         if self.gae:
             self.values = []
 
+        self.model_fn = args.model
+        if self.model_fn == '':
+            self.model_fn = 'agent_pg.pt'
+
         if args.test_pg:
             #you can load your model here
             print('loading trained model :%s.' % args.model)
@@ -212,8 +216,6 @@ class Agent_PG(Agent):
                 if reward < 0:
                     b += 1
                 tot_reward += reward
-                # if abs(reward) > 0:
-                    # loss = optimize_model()
                 if done:
                     elen = t+1
                     break
@@ -303,7 +305,7 @@ class Agent_PG(Agent):
                 print("Episode %d" % episode)
                 print(time_since(start))
                 print("%.4f %d:%d len=%d" % (running_reward, a, b, elen))
-                torch.save(self.model.state_dict(), "agent_pg.pt")
+                torch.save(self.model.state_dict(), self.model_fn)
 
     def make_action(self, state, test=True):
         """

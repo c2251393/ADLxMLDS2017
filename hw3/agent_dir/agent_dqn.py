@@ -115,11 +115,16 @@ class Agent_DQN(Agent):
         self.steps_done = 0
         self.act_by_model = 0
 
+        self.model_fn = args.model
+        if self.model_fn == '':
+            self.model_fn = 'agent_dqn.pt'
+
         if args.test_dqn:
             #you can load your model here
             print('loading trained model')
             state_dict = torch.load(args.model, map_location=lambda storage, location: storage)
             self.model.load_state_dict(state_dict)
+            self.test_step = 0
 
         ##################
         # YOUR CODE HERE #
@@ -136,6 +141,7 @@ class Agent_DQN(Agent):
         ##################
         # YOUR CODE HERE #
         ##################
+        self.test_step = 0
 
 
     def train(self):
@@ -242,7 +248,7 @@ class Agent_DQN(Agent):
                       (running_reward,
                        tot_reward,
                        self.act_by_model, self.steps_done))
-            torch.save(self.model.state_dict(), "agent_dqn.pt")
+            torch.save(self.model.state_dict(), self.model_fn)
 
 
     def make_action(self, state, test=True):
@@ -267,6 +273,13 @@ class Agent_DQN(Agent):
             eps_threshold = EPS_END + (EPS_START - EPS_END) * \
                             (1 - self.steps_done / EPS_DECAY)
         self.steps_done += 1
+        if test:
+            self.test_step += 1
+        # if test:
+            # eps_threshold = 0.00001
+        # if sample > eps_threshold:
+        if self.test_step > 2000:
+            return self.env.get_random_action()
         if sample > eps_threshold or test:
             self.act_by_model += 1
             state = torch.from_numpy(state).float().unsqueeze(0)
