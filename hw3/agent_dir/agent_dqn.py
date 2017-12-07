@@ -186,7 +186,8 @@ class Agent_DQN(Agent):
             next_state_values = cu(Variable(torch.zeros(self.batch_size, 1)))
             if self.ddqn:
                 next_state_actions = self.model(non_final_next_states).max(1)[1]
-                next_state_values[non_final_mask] = self.target_model(non_final_next_states)[next_state_actions]
+                target_Q = self.target_model(non_final_next_states)
+                next_state_values[non_final_mask] = target_Q.gather(1, next_state_actions.view(-1, 1))
             else:
                 next_state_values[non_final_mask] = self.target_model(non_final_next_states).max(1)[0]
 
