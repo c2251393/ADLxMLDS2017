@@ -26,12 +26,6 @@ frame: np.array
     # I[I != 0] = 1
     # return I.reshape(1, 80, 80)
 
-def shrink(frame):
-    frame = frame[35: 35+160, :160]
-    frame = resize(rgb2gray(frame), (80, 80))
-    frame = np.reshape(frame, [1, 80, 80])
-    return frame
-
 
 def prepro(o,image_size=[80,80]):
     """
@@ -46,10 +40,20 @@ def prepro(o,image_size=[80,80]):
         Grayscale image, shape: (1, 80, 80)
 
     """
-    y = 0.2126 * o[:, :, 0] + 0.7152 * o[:, :, 1] + 0.0722 * o[:, :, 2]
-    y = y.astype(np.uint8)
+    # y = 0.2126 * o[:, :, 0] + 0.7152 * o[:, :, 1] + 0.0722 * o[:, :, 2]
+    # y = y.astype(np.uint8)
+    y = 0.2125 * o[:, :, 0] + 0.7154 * o[:, :, 1] + 0.0721 * o[:, :, 2]
     resized = scipy.misc.imresize(y, image_size)
     return np.expand_dims(resized.astype(np.float32),axis=0)
+
+
+def shrink(frame):
+    frame = frame[35: 35+160, :160]
+    return prepro(frame)
+    # frame = resize(rgb2gray(frame), (80, 80))
+    # frame = np.reshape(frame, [1, 80, 80])
+    # return frame
+
 
 
 class Model(nn.Module):

@@ -14,8 +14,9 @@ from collections import namedtuple
 import random
 import math
 import copy
-from skimage.color import rgb2gray
-from cv2 import resize
+import scipy.misc
+# from skimage.color import rgb2gray
+# from cv2 import resize
 
 USE_CUDA = torch.cuda.is_available()
 
