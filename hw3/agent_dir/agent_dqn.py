@@ -206,6 +206,7 @@ class Agent_DQN(Agent):
             return loss.data[0]
 
         running_reward = None
+        all_rewards = []
 
         for episode in range(self.n_episode):
             if self.steps_done > self.max_step:
@@ -239,10 +240,9 @@ class Agent_DQN(Agent):
                 if done:
                     break
 
-            if running_reward is None:
-                running_reward = tot_reward
-            else:
-                running_reward = 0.99 * running_reward + 0.01 * tot_reward
+            all_rewards.append(tot_reward)
+            all_rewards = all_rewards[-30:]
+            running_reward = sum(all_rewards) / len(all_rewards)
 
             if episode % self.print_every == 0:
                 print("Episode %d" % episode)
