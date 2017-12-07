@@ -52,8 +52,8 @@ class Model(nn.Module):
         # print(x.size())
         x = F.relu(self.W1(x))
         if self.duel:
-            a = F.relu(self.W2(x))
-            v = F.relu(self.Wv(x))
+            a = self.W2(x)
+            v = self.Wv(x)
             am = a.mean(1).unsqueeze(1)
             x = a + (v - am)
         else:
