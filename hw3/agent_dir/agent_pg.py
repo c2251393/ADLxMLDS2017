@@ -50,9 +50,6 @@ def prepro(o,image_size=[80,80]):
 def shrink(frame):
     frame = frame[35: 35+160, :160]
     return prepro(frame)
-    # frame = resize(rgb2gray(frame), (80, 80))
-    # frame = np.reshape(frame, [1, 80, 80])
-    # return frame
 
 
 
@@ -62,13 +59,6 @@ class Model(nn.Module):
         self.W1 = nn.Linear(80*80, 256)
         self.W2 = nn.Linear(256, 6)
         self.apply(weights_init)
-        # self.W.weight.data = norm_col_init(
-            # self.W.weight.data, 0.01)
-        # self.W.bias.data.fill_(0)
-
-        # self.lstm.bias_ih.data.fill_(0)
-        # self.lstm.bias_hh.data.fill_(0)
-        # self.hidden = cu(Variable(torch.zeros(1, 512))), cu(Variable(torch.zeros(1, 512)))
 
     def forward(self, x):
         x = x.view(x.size(0), -1)
@@ -80,23 +70,14 @@ class Model(nn.Module):
 class ModelGAE(nn.Module):
     def __init__(self):
         super(ModelGAE, self).__init__()
-        self.W1 = nn.Linear(80*80, 512)
-        self.W2 = nn.Linear(512, 256)
+        self.W1 = nn.Linear(80*80, 256)
         self.Wa = nn.Linear(256, 6)
         self.Wv = nn.Linear(256, 1)
-        # self.apply(weights_init)
-        # self.W.weight.data = norm_col_init(
-            # self.W.weight.data, 0.01)
-        # self.W.bias.data.fill_(0)
-
-        # self.lstm.bias_ih.data.fill_(0)
-        # self.lstm.bias_hh.data.fill_(0)
-        # self.hidden = cu(Variable(torch.zeros(1, 512))), cu(Variable(torch.zeros(1, 512)))
+        self.apply(weights_init)
 
     def forward(self, x):
         x = x.view(x.size(0), -1)
         x = F.relu(self.W1(x))
-        x = F.relu(self.W2(x))
         return self.Wa(x), self.Wv(x)
 
 
@@ -179,6 +160,7 @@ class Agent_PG(Agent):
         self.rewards = []
         if self.gae:
             self.values = []
+            self.entropies = []
 
         self.model_fn = args.model
         if self.model_fn == '':
@@ -305,7 +287,7 @@ class Agent_PG(Agent):
                             - self.values[i].data
                 gae = gae * self.gamma + delta_t
 
-                policy_loss = policy_loss - self.log_probs[i] * cu(Variable(gae))
+                policy_loss = policy_loss - self.log_probs[i] * cu(Variable(gae)) - 0.01 * self.entropies[i]
 
             target = (policy_loss + 0.5 * value_loss)
             loss = target.data[0, 0]
@@ -325,32 +307,34 @@ class Agent_PG(Agent):
         episode = 0
 
         for epoch in range(self.max_step):
-            for step in range(self.step_upd):
-                action = self.make_action(state, test=False)
-                state, reward, done, info = self.env.step(action)
-                self.rewards.append(reward)
-                if reward > 0:
-                    a += 1
-                if reward < 0:
-                    b += 1
-                tot_reward += reward
-                if done:
-                    episode += 1
-                    if running_reward is None:
-                        running_reward = tot_reward
-                    else:
-                        running_reward = 0.99 * running_reward + 0.01 * tot_reward
-                    if episode % self.print_every == 0:
-                        print("Episode %d" % episode)
-                        print(time_since(start))
-                        print("%.4f %d:%d" % (running_reward, a, b))
+            action = self.make_action(state, test=False)
+            state, reward, done, info = self.env.step(action)
+            self.rewards.append(reward)
 
-                    self.init_game_setting()
-                    state = self.env.reset()
-                    tot_reward, a, b = 0, 0, 0
+            if reward > 0:
+                a += 1
+            if reward < 0:
+                b += 1
+            tot_reward += reward
 
-            optimize_model()
-            torch.save(self.model.state_dict(), self.model_fn)
+            if done:
+                episode += 1
+                if running_reward is None:
+                    running_reward = tot_reward
+                else:
+                    running_reward = 0.99 * running_reward + 0.01 * tot_reward
+                if episode % self.print_every == 0:
+                    print("Episode %d" % episode)
+                    print(time_since(start))
+                    print("%.4f %d:%d" % (running_reward, a, b))
+
+                self.init_game_setting()
+                state = self.env.reset()
+                tot_reward, a, b = 0, 0, 0
+
+            if epoch % self.step_upd == 0:
+                optimize_model()
+                torch.save(self.model.state_dict(), self.model_fn)
 
     def make_action(self, state, test=True):
         """
@@ -378,6 +362,7 @@ class Agent_PG(Agent):
 
         prob = F.softmax(y)
         log_prob = F.log_softmax(y)
+        entropy = -(log_prob * prob).sum(1)
         act = prob.multinomial().data
         log_prob = log_prob.gather(1, cu(Variable(act)))
 
@@ -385,6 +370,7 @@ class Agent_PG(Agent):
             self.log_probs.append(log_prob)
             if self.gae:
                 self.values.append(val)
+                self.entropies.append(entropy)
         return act[0, 0]
 
     def clear_action(self):
@@ -392,3 +378,4 @@ class Agent_PG(Agent):
         self.rewards = []
         if self.gae:
             self.values = []
+            self.entropies = []
