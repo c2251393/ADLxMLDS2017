@@ -333,7 +333,8 @@ class Agent_PG(Agent):
                 tot_reward, a, b = 0, 0, 0
 
             if epoch % self.step_upd == 0:
-                optimize_model()
+                if len(self.rewards) > 0:
+                    optimize_model()
                 torch.save(self.model.state_dict(), self.model_fn)
 
     def make_action(self, state, test=True):
