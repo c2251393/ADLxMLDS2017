@@ -87,14 +87,14 @@ class Model2(nn.Module):
         self.conv1 = nn.Conv2d(1, 16, 8, stride=4)
         self.conv2 = nn.Conv2d(16, 32, 4, stride=2)
 
-        self.W1 = nn.Linear(2048, 256)
-        self.W2 = nn.Linear(256, 6)
+        self.W1 = nn.Linear(2048, 128)
+        self.W2 = nn.Linear(128, 6)
         self.apply(weights_init)
 
     def forward(self, x):
         x = x.unsqueeze(0)
         x = F.relu(self.conv1(x))
-        x = F.leaky_relu(self.conv2(x))
+        x = F.relu(self.conv2(x))
         x = x.view(x.size(0), -1)
         x = F.relu(self.W1(x))
         x = self.W2(x)
@@ -141,6 +141,7 @@ class Agent_PG(Agent):
         self.gae = args.gae
         self.step_upd = args.step_upd
         self.max_step = args.step_train
+        self.clip = args.clip
 
         if not self.gae:
             if args.cnn:
@@ -153,7 +154,12 @@ class Agent_PG(Agent):
             else:
                 self.model = ModelGAE()
 
-        self.opt = optim.RMSprop(self.model.parameters(), lr=args.learning_rate)
+        print(self.model)
+
+        if args.cnn:
+            self.opt = optim.RMSprop(self.model.parameters(), lr=args.learning_rate, weight_decay=0.99)
+        else:
+            self.opt = optim.Adam(self.model.parameters(), lr=args.learning_rate)
 
         self.state = np.zeros((1, 80, 80))
         self.log_probs = []
@@ -294,6 +300,8 @@ class Agent_PG(Agent):
 
             self.opt.zero_grad()
             target.backward()
+            if self.clip:
+                torch.nn.utils.clip_grad_norm(player.model.parameters(), 40)
             self.opt.step()
 
             self.clear_action()
