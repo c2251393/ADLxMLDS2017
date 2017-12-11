@@ -290,15 +290,51 @@ class Agent_DQN(Agent):
     def train_a2c(self):
         start = time.time()
         self.model.train()
+        if USE_CUDA:
+            self.model.cuda()
 
-        def update_network():
+        state = self.env.reset()
+        episode = 0
+        all_rewards = []
+        tot_reward = 0
+
+        for epoch in range(1, self.max_step+1):
+            done = False
+            for step in range(self.step_upd):
+                action = self.make_action(state, test=False)
+                state, reward, done, info = self.env.step(action)
+                self.rewards.append(reward)
+
+                tot_reward += reward
+
+                if done:
+                    state = self.env.reset()
+                    episode += 1
+                    all_rewards.append(tot_reward)
+
+                    all_rewards = all_rewards[-30:]
+                    running_reward = sum(all_rewards) / len(all_rewards)
+
+                    if episode % self.print_every == 0:
+                        print("Episode %d" % episode)
+                        print(time_since(start))
+                        print("%g %d %d" % (running_reward, tot_reward, epoch))
+
+                    tot_reward = 0
+                    break
+
             policy_loss = 0
             value_loss = 0
 
-            R = cu(Variable(torch.zeros(1, 1)))
-            gae = cu(torch.zeros(1, 1))
+            R = torch.zeros(1, 1)
+            if not done:
+                fstate = torch.from_numpy(state).float().unsqueeze(0)
+                _, val = self.model(cu(Variable(fstate)))
+                R = val.data
 
-            self.values.append(cu(Variable(torch.zeros(1, 1))))
+            self.values.append(cu(Variable(R)))
+            R = cu(Variable(R))
+            gae = cu(torch.zeros(1, 1))
 
             for i in reversed(range(len(self.rewards))):
                 R = self.gamma * R + self.rewards[i]
@@ -317,43 +353,12 @@ class Agent_DQN(Agent):
             self.opt.zero_grad()
             target.backward()
             if self.clip:
-                torch.nn.utils.clip_grad_norm(player.model.parameters(), 0.05)
+                torch.nn.utils.clip_grad_norm(player.model.parameters(), 40)
             self.opt.step()
 
             self.clear_action()
 
-            return loss
-
-        state = self.env.reset()
-        episode = 0
-        all_rewards = []
-        tot_reward = 0
-
-        for epoch in range(1, self.max_step+1):
-            action = self.make_action(state, test=False)
-            state, reward, done, info = self.env.step(action)
-            self.rewards.append(reward)
-
-            tot_reward += reward
-
-            if done:
-                state = self.env.reset()
-                episode += 1
-                all_rewards.append(tot_reward)
-
-                all_rewards = all_rewards[-30:]
-                running_reward = sum(all_rewards) / len(all_rewards)
-
-                if episode % self.print_every == 0:
-                    print("Episode %d" % episode)
-                    print(time_since(start))
-                    print("%g %d %d" % (running_reward, tot_reward, epoch))
-
-                tot_reward = 0
-
-            if epoch % self.step_upd == 0:
-                update_network()
-                torch.save(self.model.state_dict(), self.model_fn)
+            torch.save(self.model.state_dict(), self.model_fn)
 
 
     def make_action(self, state, test=True):
