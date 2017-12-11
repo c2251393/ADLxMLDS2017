@@ -31,4 +31,6 @@ def add_arguments(parser):
     parser.add_argument('--duel', action='store_true', help='Duel DQN')
 
     parser.add_argument('--clip', action='store_true', help='clip grad magnitude for DQN')
+
+    parser.add_argument('--a2c', action='store_true', help='run a2c for breakout (agent_dqn)')
     return parser

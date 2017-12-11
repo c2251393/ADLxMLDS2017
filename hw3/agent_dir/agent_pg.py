@@ -107,9 +107,9 @@ class ModelGAE2(nn.Module):
         self.conv1 = nn.Conv2d(1, 16, 8, stride=4)
         self.conv2 = nn.Conv2d(16, 32, 4, stride=2)
 
-        self.W1 = nn.Linear(2048, 256)
-        self.Wa = nn.Linear(256, 6)
-        self.Wv = nn.Linear(256, 1)
+        self.W1 = nn.Linear(2048, 128)
+        self.Wa = nn.Linear(128, 6)
+        self.Wv = nn.Linear(128, 1)
         self.apply(weights_init)
 
     def forward(self, x):

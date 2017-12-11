@@ -31,12 +31,6 @@ class Model(nn.Module):
         if self.duel:
             self.Wv = nn.Linear(512, 1)
         self.apply(weights_init)
-        # self.W1.weight.data = norm_col_init(
-            # self.W1.weight.data, 0.01)
-        # self.W1.bias.data.fill_(0)
-        # self.W2.weight.data = norm_col_init(
-            # self.W2.weight.data, 0.01)
-        # self.W2.bias.data.fill_(0)
 
     def forward(self, x):
         # (B, 84, 84, 4)
@@ -59,6 +53,29 @@ class Model(nn.Module):
         else:
             x = self.W2(x)
         return x
+
+class ModelA2C(nn.Module):
+    def __init__(self):
+        super(ModelA2C, self).__init__()
+        self.conv1 = nn.Conv2d(4, 32, 8, stride=4)
+        self.conv2 = nn.Conv2d(32, 64, 4, stride=2)
+        self.conv3 = nn.Conv2d(64, 64, 3, stride=1)
+
+        self.W1 = nn.Linear(3136, 512)
+        self.Wa = nn.Linear(512, 4)
+        self.Wv = nn.Linear(512, 1)
+        self.apply(weights_init)
+
+    def forward(self, x):
+        # (B, 84, 84, 4)
+        x = x.transpose(2, 3).transpose(1, 2)
+        # (B, 4, 84, 84)
+        x = F.relu(self.conv1(x))
+        x = F.relu(self.conv2(x))
+        x = F.leaky_relu(self.conv3(x))
+        x = x.view(x.size(0), -1)
+        x = F.relu(self.W1(x))
+        return self.Wa(x), self.Wv(x)
 
 
 Transition = namedtuple('Transition',
@@ -106,11 +123,18 @@ class Agent_DQN(Agent):
         self.ddqn = args.ddqn
         self.duel = args.duel
         self.clip = args.clip
+        self.a2c = args.a2c
 
         self.model = Model(self.duel)
-        self.target_model = Model()
+        self.target_model = Model(self.duel)
         self.opt = optim.RMSprop(self.model.parameters(), lr=args.learning_rate)
         self.memory = ReplayMemory(args.buffer_size)
+        if self.a2c:
+            self.model = ModelA2C()
+            self.log_probs = []
+            self.rewards = []
+            self.values = []
+            self.entropies = []
 
         self.steps_done = 0
         self.act_by_model = 0
@@ -153,6 +177,10 @@ class Agent_DQN(Agent):
         ##################
         # YOUR CODE HERE #
         ##################
+        if self.a2c:
+            self.train_a2c()
+            return
+
         start = time.time()
         self.model.train()
         self.target_model.eval()
@@ -253,6 +281,80 @@ class Agent_DQN(Agent):
                        self.act_by_model, self.steps_done, t))
             torch.save(self.model.state_dict(), self.model_fn)
 
+    def clear_action(self):
+        self.log_probs = []
+        self.rewards = []
+        self.values = []
+        self.entropies = []
+
+    def train_a2c(self):
+        start = time.time()
+        self.model.train()
+
+        def update_network():
+            policy_loss = 0
+            value_loss = 0
+
+            R = cu(Variable(torch.zeros(1, 1)))
+            gae = cu(torch.zeros(1, 1))
+
+            self.values.append(cu(Variable(torch.zeros(1, 1))))
+
+            for i in reversed(range(len(self.rewards))):
+                R = self.gamma * R + self.rewards[i]
+                advantage = R - self.values[i]
+                value_loss = value_loss + 0.5 * advantage.pow(2)
+
+                delta_t = self.rewards[i] + self.gamma * self.values[i+1].data \
+                            - self.values[i].data
+                gae = gae * self.gamma + delta_t
+
+                policy_loss = policy_loss - self.log_probs[i] * cu(Variable(gae)) - 0.01 * self.entropies[i]
+
+            target = (policy_loss + 0.5 * value_loss)
+            loss = target.data[0, 0]
+
+            self.opt.zero_grad()
+            target.backward()
+            if self.clip:
+                torch.nn.utils.clip_grad_norm(player.model.parameters(), 0.05)
+            self.opt.step()
+
+            self.clear_action()
+
+            return loss
+
+        state = self.env.reset()
+        episode = 0
+        all_rewards = []
+        tot_reward = 0
+
+        for epoch in range(1, self.max_step+1):
+            action = self.make_action(state, test=False)
+            state, reward, done, info = self.env.step(action)
+            self.rewards.append(reward)
+
+            tot_reward += reward
+
+            if done:
+                state = self.env.reset()
+                episode += 1
+                all_rewards.append(tot_reward)
+
+                all_rewards = all_rewards[-30:]
+                running_reward = sum(all_rewards) / len(all_rewards)
+
+                if episode % self.print_every == 0:
+                    print("Episode %d" % episode)
+                    print(time_since(start))
+                    print("%g %d %d" % (running_reward, tot_reward, epoch))
+
+                tot_reward = 0
+
+            if epoch % self.step_upd == 0:
+                update_network()
+                torch.save(self.model.state_dict(), self.model_fn)
+
 
     def make_action(self, state, test=True):
         """
@@ -269,6 +371,24 @@ class Agent_DQN(Agent):
         ##################
         # YOUR CODE HERE #
         ##################
+        if self.a2c:
+            state = torch.from_numpy(state).float().unsqueeze(0)
+            # state: (1, 84, 84, 4)
+            y, val = self.model(cu(Variable(state)))
+            prob = F.softmax(y)
+            log_prob = F.log_softmax(y)
+            entropy = -(log_prob * prob).sum(1)
+
+            act = prob.multinomial().data
+            log_prob = log_prob.gather(1, cu(Variable(act)))
+
+            if not test:
+                self.log_probs.append(log_prob)
+                self.values.append(val)
+                self.entropies.append(entropy)
+
+            return act[0, 0]
+
         sample = random.random()
         if self.steps_done > EPS_DECAY:
             eps_threshold = EPS_END
