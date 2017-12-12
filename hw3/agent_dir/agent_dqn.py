@@ -57,14 +57,13 @@ class Model(nn.Module):
 class ModelA2C(nn.Module):
     def __init__(self):
         super(ModelA2C, self).__init__()
-        self.conv1 = nn.Conv2d(4, 32, 8, stride=4)
-        self.conv2 = nn.Conv2d(32, 64, 4, stride=2)
-        self.conv3 = nn.Conv2d(64, 64, 3, stride=1)
+        self.conv1 = nn.Conv2d(4, 16, 8, stride=4)
+        self.conv2 = nn.Conv2d(16, 32, 4, stride=2)
 
-        self.W1 = nn.Linear(3136, 512)
-        self.Wa = nn.Linear(512, 4)
-        self.Wv = nn.Linear(512, 1)
-        self.apply(weights_init)
+        self.W1 = nn.Linear(2592, 256)
+        self.Wa = nn.Linear(256, 4)
+        self.Wv = nn.Linear(256, 1)
+        # self.apply(weights_init)
 
     def forward(self, x):
         # (B, 84, 84, 4)
@@ -72,7 +71,6 @@ class ModelA2C(nn.Module):
         # (B, 4, 84, 84)
         x = F.relu(self.conv1(x))
         x = F.relu(self.conv2(x))
-        x = F.leaky_relu(self.conv3(x))
         x = x.view(x.size(0), -1)
         x = F.relu(self.W1(x))
         return self.Wa(x), self.Wv(x)
@@ -130,6 +128,7 @@ class Agent_DQN(Agent):
         self.opt = optim.RMSprop(self.model.parameters(), lr=args.learning_rate)
         self.memory = ReplayMemory(args.buffer_size)
         if self.a2c:
+            self.opt = optim.RMSprop(self.model.parameters(), lr=args.learning_rate, weight_decay=0.99)
             self.model = ModelA2C()
             self.log_probs = []
             self.rewards = []
@@ -339,11 +338,13 @@ class Agent_DQN(Agent):
             for i in reversed(range(len(self.rewards))):
                 R = self.gamma * R + self.rewards[i]
                 advantage = R - self.values[i]
-                value_loss = value_loss + 0.5 * advantage.pow(2)
+                # value_loss = value_loss + 0.5 * advantage.pow(2)
+                value_loss = value_loss + advantage.pow(2)
 
-                delta_t = self.rewards[i] + self.gamma * self.values[i+1].data \
-                            - self.values[i].data
-                gae = gae * self.gamma + delta_t
+                # delta_t = self.rewards[i] + self.gamma * self.values[i+1].data \
+                            # - self.values[i].data
+                # gae = gae * self.gamma + delta_t
+                gae = advantage.data
 
                 policy_loss = policy_loss - self.log_probs[i] * cu(Variable(gae)) - 0.01 * self.entropies[i]
 

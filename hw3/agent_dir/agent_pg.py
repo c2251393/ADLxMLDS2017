@@ -285,8 +285,6 @@ class Agent_PG(Agent):
             self.values.append(cu(Variable(torch.zeros(1, 1))))
 
             for i in reversed(range(len(self.rewards))):
-                if abs(self.rewards[i]) > 0.0:
-                    R = 0
                 R = self.gamma * R + self.rewards[i]
                 advantage = R - self.values[i]
                 value_loss = value_loss + 0.5 * advantage.pow(2)
@@ -310,39 +308,41 @@ class Agent_PG(Agent):
 
             return loss
 
-        self.model.train()
-        if USE_CUDA:
-            self.model.cuda()
-        running_reward = None
+        self.init_game_setting()
+        state = self.env.reset()
+        tot_reward, a, b = 0, 0, 0
 
-        for episode in range(1, self.n_episode+1):
-            self.init_game_setting()
-            state = self.env.reset()
+        episode = 0
 
-            tot_reward = 0
-            a, b = 0, 0
-            for t in range(self.episode_len):
-                action = self.make_action(state, test=False)
-                state, reward, done, info = self.env.step(action)
-                self.rewards.append(reward)
-                if reward > 0:
-                    a += 1
-                if reward < 0:
-                    b += 1
-                tot_reward += reward
-                if done:
-                    break
+        for epoch in range(1, self.max_step+1):
+            action = self.make_action(state, test=False)
+            state, reward, done, info = self.env.step(action)
+            self.rewards.append(reward)
 
-            if running_reward is None:
-                running_reward = tot_reward
-            else:
-                running_reward = 0.99 * running_reward + 0.01 * tot_reward
+            if reward > 0:
+                a += 1
+            if reward < 0:
+                b += 1
+            tot_reward += reward
 
-            if episode % self.update_every == 0:
-                loss = optimize_model()
-                print("Episode %d" % episode)
-                print(time_since(start))
-                print("reward %.4f %d:%d len=%d" % (running_reward, a, b, t))
+            if done:
+                episode += 1
+                if running_reward is None:
+                    running_reward = tot_reward
+                else:
+                    running_reward = 0.99 * running_reward + 0.01 * tot_reward
+                if episode % self.print_every == 0:
+                    print("Episode %d" % episode)
+                    print(time_since(start))
+                    print("%.4f %d:%d" % (running_reward, a, b))
+
+                self.init_game_setting()
+                state = self.env.reset()
+                tot_reward, a, b = 0, 0, 0
+
+            if epoch % self.step_upd == 0:
+                if len(self.rewards) > 0:
+                    optimize_model()
                 torch.save(self.model.state_dict(), self.model_fn)
 
     def make_action(self, state, test=True):
