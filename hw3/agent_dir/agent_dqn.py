@@ -141,11 +141,13 @@ class Agent_DQN(Agent):
         self.model_fn = args.model
         if self.model_fn == '':
             self.model_fn = 'agent_dqn.pt'
+            if args.test_pg:
+                self.model_fn = 'dqn.baseline.pt'
 
         if args.test_dqn:
             #you can load your model here
             print('loading trained model')
-            state_dict = torch.load(args.model, map_location=lambda storage, location: storage)
+            state_dict = torch.load(self.model_fn, map_location=lambda storage, location: storage)
             self.model.load_state_dict(state_dict)
             if USE_CUDA:
                 self.model.cuda()

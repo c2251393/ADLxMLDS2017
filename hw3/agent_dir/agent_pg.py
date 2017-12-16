@@ -171,11 +171,13 @@ class Agent_PG(Agent):
         self.model_fn = args.model
         if self.model_fn == '':
             self.model_fn = 'agent_pg.pt'
+            if args.test_pg:
+                self.model_fn = 'pg.baseline.pt'
 
         if args.test_pg:
             #you can load your model here
-            print('loading trained model :%s.' % args.model)
-            state_dict = torch.load(args.model, map_location=lambda storage, location: storage)
+            print('loading trained model :%s.' % self.model_fn)
+            state_dict = torch.load(self.model_fn, map_location=lambda storage, location: storage)
             self.model.load_state_dict(state_dict)
             if USE_CUDA:
                 self.model.cuda()
