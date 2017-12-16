@@ -141,7 +141,7 @@ class Agent_DQN(Agent):
         self.model_fn = args.model
         if self.model_fn == '':
             self.model_fn = 'agent_dqn.pt'
-            if args.test_pg:
+            if args.test_dqn:
                 self.model_fn = 'dqn.baseline.pt'
 
         if args.test_dqn:
