@@ -133,8 +133,10 @@ def test_and_save(epoch):
         os.path.join("models", model_name)
     )
 
+start = time.time()
+
 for epoch in range(1, args.n_epoch+1):
-    print("Epoch %d" % epoch)
+    print("Epoch %d %s" % (epoch, time_since(start)))
     for (i, (batch, fake_batch)) in enumerate(zip(loader, fake_loader)):
         # print(gen(batch[2], batch[3]))
         # break
@@ -145,7 +147,5 @@ for epoch in range(1, args.n_epoch+1):
             g_loss = train_G(batch)
             print(g_loss)
         iter += 1
-        if i > 0:
-            break
     if epoch % args.test_every == 0:
         test_and_save(epoch)
