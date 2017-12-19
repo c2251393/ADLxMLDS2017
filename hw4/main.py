@@ -113,6 +113,8 @@ def train_G(batch):
     return loss.data[0]
 
 def test_and_save(epoch):
+    mD.eval()
+    mG.eval()
     test_fn = os.path.join("data", "sample_testing_text.txt")
     for line in open(test_fn).readlines():
         print(line)
@@ -136,16 +138,18 @@ def test_and_save(epoch):
 start = time.time()
 
 for epoch in range(1, args.n_epoch+1):
+    mD.train()
+    mG.train()
     print("Epoch %d %s" % (epoch, time_since(start)))
     for (i, (batch, fake_batch)) in enumerate(zip(loader, fake_loader)):
         # print(gen(batch[2], batch[3]))
         # break
         if round(iter) == 'D':
             d_loss = train_D(batch, fake_batch)
-            print(d_loss)
+            print("d_loss", d_loss)
         else:
             g_loss = train_G(batch)
-            print(g_loss)
+            print("g_loss", g_loss)
         iter += 1
     if epoch % args.test_every == 0:
         test_and_save(epoch)
