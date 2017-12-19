@@ -101,9 +101,10 @@ def train_G(batch):
     H = torch.cat([cu(Variable(eyes)), cu(Variable(hair))], dim=1)
 
     sf = mD(fX, H) # fake image right text
-    zeros = cu(Variable(torch.zeros(batch_size).long()))
+    ones = cu(Variable(torch.ones(batch_size).long()))
+    # zeros = cu(Variable(torch.zeros(batch_size).long()))
 
-    loss = criterion(sf, zeros)
+    loss = criterion(sf, ones)
     loss = cu(loss)
 
     optG.zero_grad()
