@@ -153,6 +153,6 @@ for epoch in range(1, args.n_epoch+1):
         else:
             g_loss += train_G(batch)
         iter += 1
-    print("Epoch %d %s d %g g%g" % (epoch, time_since(start), d_loss, g_loss))
+    print("Epoch %d %s d %g g %g" % (epoch, time_since(start), d_loss, g_loss))
     if epoch % args.test_every == 0:
         test_and_save(epoch)
