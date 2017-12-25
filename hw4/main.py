@@ -141,16 +141,15 @@ start = time.time()
 for epoch in range(1, args.n_epoch+1):
     mD.train()
     mG.train()
-    print("Epoch %d %s" % (epoch, time_since(start)))
+    d_loss, g_loss = 0, 0
     for (i, (batch, fake_batch)) in enumerate(zip(loader, fake_loader)):
         # print(gen(batch[2], batch[3]))
         # break
         if round(iter) == 'D':
-            d_loss = train_D(batch, fake_batch)
-            print("d_loss", d_loss)
+            d_loss += train_D(batch, fake_batch)
         else:
-            g_loss = train_G(batch)
-            print("g_loss", g_loss)
+            g_loss += train_G(batch)
         iter += 1
+    print("Epoch %d %s d %g g%g" % (epoch, time_since(start), d_loss, g_loss))
     if epoch % args.test_every == 0:
         test_and_save(epoch)

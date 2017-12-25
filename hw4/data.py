@@ -10,7 +10,7 @@ class Anime(Dataset):
         self.ids = []
         id_tag_csv = csv.reader(open(os.path.join(dir, 'tags_clean.csv')))
         for (i, (id, attrs)) in enumerate(id_tag_csv):
-            if i >= 2000:
+            if i >= 200:
                 break
             attrs = attrs.split('\t')
             # print(id, attrs)
