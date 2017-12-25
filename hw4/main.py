@@ -51,10 +51,13 @@ def round(iter):
 
 iter = 0
 
-def gen(eyes, hair):
+fixed_noise = [cu(Variable(torch.zeros(1, args.noise).normal_())) for i in range(5)]
+
+def gen(eyes, hair, Z=None):
     # eyes, hair: (B, 50)
     batch_size = eyes.size(0)
-    Z = cu(Variable(torch.zeros(batch_size, args.noise).normal_()))
+    if Z is None:
+        Z = cu(Variable(torch.zeros(batch_size, args.noise).normal_()))
     Y = torch.cat([cu(Variable(eyes)), cu(Variable(hair)), Z], dim=1)
     fX = mG(Y)
     return fX
@@ -123,7 +126,7 @@ def test_and_save(epoch):
         eyes, hair = get_tag(desc[:-1])
         for i in range(1, 5+1):
             out_fn = os.path.join("output", "sample_%s_%d.jpg" % (id, i))
-            y = gen(eyes, hair)
+            y = gen(eyes, hair, fixed_noise[i-1])
             print(out_fn)
             to_img(y[0].data, out_fn)
 

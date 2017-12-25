@@ -58,6 +58,7 @@ HAIR_VEC = [torch.zeros(50).float()] + [glove[s.split()[0]] for s in HAIR[1:]]
 
 def to_img(x, fn):
     # x: (3, 64, 64) tensor
+    x = x.cpu()
     M = x.max()
     m = x.min()
     x = (x - m) / (M - m)
