@@ -25,237 +25,199 @@ def conv(c_in, c_out, k_size, stride=2, pad=1, bn=True):
         layers.append(nn.BatchNorm2d(c_out))
     return nn.Sequential(*layers)
 
-class G12(nn.Module):
-    """Generator: Anime -> Celeba"""
+class G(nn.Module):
     def __init__(self, conv_dim=64):
-        super(G12, self).__init__()
-        # encoding blocks
-        self.conv1 = conv(1, conv_dim, 4)
-        self.conv2 = conv(conv_dim, conv_dim*2, 4)
-        
-        # residual blocks
-        self.conv3 = conv(conv_dim*2, conv_dim*2, 3, 1, 1)
-        self.conv4 = conv(conv_dim*2, conv_dim*2, 3, 1, 1)
-        
-        # decoding blocks
-        self.deconv1 = deconv(conv_dim*2, conv_dim, 4)
-        self.deconv2 = deconv(conv_dim, 3, 4, bn=False)
-        
-    def forward(self, x):
-        out = F.leaky_relu(self.conv1(x), 0.05)      # (?, 64, 16, 16)
-        out = F.leaky_relu(self.conv2(out), 0.05)    # (?, 128, 8, 8)
-        
-        out = F.leaky_relu(self.conv3(out), 0.05)    # ( " )
-        out = F.leaky_relu(self.conv4(out), 0.05)    # ( " )
-        
-        out = F.leaky_relu(self.deconv1(out), 0.05)  # (?, 64, 16, 16)
-        out = F.tanh(self.deconv2(out))              # (?, 3, 32, 32)
-        return out
-    
-class G21(nn.Module):
-    """Generator: Celeba -> Anime"""
-    def __init__(self, conv_dim=64):
-        super(G21, self).__init__()
+        super(G, self).__init__()
         # encoding blocks
         self.conv1 = conv(3, conv_dim, 4)
         self.conv2 = conv(conv_dim, conv_dim*2, 4)
-        
+
         # residual blocks
         self.conv3 = conv(conv_dim*2, conv_dim*2, 3, 1, 1)
         self.conv4 = conv(conv_dim*2, conv_dim*2, 3, 1, 1)
-        
+
         # decoding blocks
         self.deconv1 = deconv(conv_dim*2, conv_dim, 4)
-        self.deconv2 = deconv(conv_dim, 1, 4, bn=False)
-        
+        self.deconv2 = deconv(conv_dim, 3, 4, bn=False)
+
     def forward(self, x):
         out = F.leaky_relu(self.conv1(x), 0.05)      # (?, 64, 16, 16)
         out = F.leaky_relu(self.conv2(out), 0.05)    # (?, 128, 8, 8)
-        
+
         out = F.leaky_relu(self.conv3(out), 0.05)    # ( " )
         out = F.leaky_relu(self.conv4(out), 0.05)    # ( " )
-        
+
         out = F.leaky_relu(self.deconv1(out), 0.05)  # (?, 64, 16, 16)
-        out = F.tanh(self.deconv2(out))              # (?, 1, 32, 32)
-        return out
-    
-class D1(nn.Module):
-    """Discriminator for mnist."""
-    def __init__(self, conv_dim=64, use_labels=False):
-        super(D1, self).__init__()
-        self.conv1 = conv(1, conv_dim, 4, bn=False)
-        self.conv2 = conv(conv_dim, conv_dim*2, 4)
-        self.conv3 = conv(conv_dim*2, conv_dim*4, 4)
-        n_out = 11 if use_labels else 1
-        self.fc = conv(conv_dim*4, n_out, 4, 1, 0, False)
-        
-    def forward(self, x):
-        out = F.leaky_relu(self.conv1(x), 0.05)    # (?, 64, 16, 16)
-        out = F.leaky_relu(self.conv2(out), 0.05)  # (?, 128, 8, 8)
-        out = F.leaky_relu(self.conv3(out), 0.05)  # (?, 256, 4, 4)
-        out = self.fc(out).squeeze()
+        out = F.tanh(self.deconv2(out))              # (?, 3, 32, 32)
         return out
 
-class D2(nn.Module):
+class D(nn.Module):
     """Discriminator for svhn."""
-    def __init__(self, conv_dim=64, use_labels=False):
-        super(D2, self).__init__()
+    def __init__(self, conv_dim=64):
+        super(D, self).__init__()
         self.conv1 = conv(3, conv_dim, 4, bn=False)
         self.conv2 = conv(conv_dim, conv_dim*2, 4)
         self.conv3 = conv(conv_dim*2, conv_dim*4, 4)
-        n_out = 11 if use_labels else 1
+        self.conv4 = conv(conv_dim*4, conv_dim*4, 4)
+        n_out = 1
         self.fc = conv(conv_dim*4, n_out, 4, 1, 0, False)
-        
+
     def forward(self, x):
-        out = F.leaky_relu(self.conv1(x), 0.05)    # (?, 64, 16, 16)
-        out = F.leaky_relu(self.conv2(out), 0.05)  # (?, 128, 8, 8)
-        out = F.leaky_relu(self.conv3(out), 0.05)  # (?, 256, 4, 4)
+        out = F.leaky_relu(self.conv1(x), 0.05)    # (?, 64, 32, 32)
+        out = F.leaky_relu(self.conv2(out), 0.05)  # (?, 128, 16, 16)
+        out = F.leaky_relu(self.conv3(out), 0.05)  # (?, 256, 8, 8)
+        out = F.leaky_relu(self.conv4(out), 0.05)  # (?, 256, 4, 4)
         out = self.fc(out).squeeze()
         return out
 
 args = parser.parse_args()
 print("load the data in")
-data1 = AnimeRaw(args.data, args.pre)
-data2 = Celeba(args.data, args.pre)
+anime_data = AnimeRaw(args.data, args.pre)
+celeb_data = Celeba(args.data, args.pre)
 print("data loaded")
-# try:
-    # data = pickle.load(open('data.pt', 'rb'))
-# except:
-    # print("load the data in")
-    # data = Anime(args.data)
-    # print("data loaded")
-    # pickle.dump(data, open('data.pt', 'wb'))
 
-loader1 = DataLoader(data1, batch_size=args.batch_size, shuffle=True)
-loader2 = DataLoader(data2, batch_size=args.batch_size, shuffle=True)
+anime_loader = DataLoader(anime_data, batch_size=args.batch_size, shuffle=True)
+celeb_loader = DataLoader(celeb_data, batch_size=args.batch_size, shuffle=True)
 
-exit()
+mG12 = G()
+mG21 = G()
+mD1 = D()
+mD2 = D()
 
-mG = Generator(args.noise)
-mD = Discriminator(True)
-
-mG.train()
-mD.train()
+mG12.train()
+mG21.train()
+mD1.train()
+mD2.train()
 
 if USE_CUDA:
-    mG.cuda()
-    mD.cuda()
+    mG12.cuda()
+    mG21.cuda()
+    mD1.cuda()
+    mD2.cuda()
 
-optG = optim.Adam(mG.parameters(), lr=args.lr, betas=(0.5, 0.999))
-optD = optim.Adam(mD.parameters(), lr=args.lr, betas=(0.5, 0.999))
+G_params = list(mG12.parameters()) + list(mG21.parameters())
+D_params = list(mD1.parameters()) + list(mD2.parameters())
+
+optG = optim.Adam(G_params, lr=args.lr, betas=(0.5, 0.999))
+optD = optim.Adam(D_params, lr=args.lr, betas=(0.5, 0.999))
 criterion = nn.CrossEntropyLoss()
-
-def round(iter):
-    if iter % (args.G_step + args.D_step) < args.D_step:
-        return 'D'
-    else:
-        return 'G'
 
 iter = 0
 
-fixed_noise = [cu(Variable(torch.zeros(1, args.noise).normal_())) for i in range(5)]
-
-def gen(eyes, hair, Z=None):
-    # eyes, hair: (B, 50)
-    batch_size = eyes.size(0)
-    if Z is None:
-        Z = cu(Variable(torch.zeros(batch_size, args.noise).normal_()))
-    Y = torch.cat([cu(Variable(eyes)), cu(Variable(hair)), Z], dim=1)
-    fX = mG(Y)
-    return fX
-
-def train_D(batch, fake_batch):
-    ids, feats, eyes, hair = batch
-    batch_size = eyes.size(0)
-
-    wids, wfeats, weyes, whair = fake_batch
-    # print(ids[:5], wids[:5])
-
-    X = cu(Variable(feats.float()))
-    wX = cu(Variable(wfeats.float()))
-    fX = gen(eyes, hair)
-
-    H = torch.cat([cu(Variable(eyes)), cu(Variable(hair))], dim=1)
-    wH = torch.cat([cu(Variable(weyes)), cu(Variable(whair))], dim=1)
-
-    sr = mD(X, H) # real img right txt
-
-    sw = mD(X, wH) # real img wrong txt
-    sf = mD(fX, H) # fake img right txt
-    sW = mD(wX, H) # wrong img right txt
-
-    ones = cu(Variable(torch.ones(batch_size).long()))
-    zeros = cu(Variable(torch.zeros(batch_size).long()))
-
-    loss = criterion(sr, ones) + \
-            (criterion(sw, zeros) + criterion(sf, zeros) + criterion(sW, zeros)) / 3
-    loss = cu(loss)
-
-    optD.zero_grad()
-    loss.backward()
-    optD.step()
-
-    return loss.data[0]
-
-def train_G(batch):
-    ids, feats, eyes, hair = batch
-    batch_size = eyes.size(0)
-    X = cu(Variable(feats.float()))
-    fX = gen(eyes, hair)
-
-    H = torch.cat([cu(Variable(eyes)), cu(Variable(hair))], dim=1)
-
-    sf = mD(fX, H) # fake image right text
-    ones = cu(Variable(torch.ones(batch_size).long()))
-    # zeros = cu(Variable(torch.zeros(batch_size).long()))
-
-    loss = criterion(sf, ones)
-    loss = cu(loss)
-
-    optG.zero_grad()
-    loss.backward()
-    optG.step()
-
-    return loss.data[0]
-
 def test_and_save(epoch):
-    mD.eval()
-    mG.eval()
-    test_fn = os.path.join("data", "sample_testing_text.txt")
-    for line in open(test_fn).readlines():
-        print(line)
-        id, desc = line.split(',')
-        eyes, hair = get_tag(desc[:-1])
-        for i in range(1, 5+1):
-            out_fn = os.path.join("output", "sample_%d_%s_%d.jpg" % (epoch, id, i))
-            y = gen(eyes, hair, fixed_noise[i-1])
-            print(out_fn)
-            to_img(y[0].data, out_fn)
+    mG12.eval()
+    mG21.eval()
 
-    model_name = "D%d.G%d.n%d.e%d.pt" % (args.D_step, args.G_step, args.noise, epoch)
+    for i in range(10):
+        anime_img = torch.from_numpy(random.choice(anime_data)).float().unsqueeze(0)
+        gen_img = mG12(cu(Variable(anime_img))).data
+        out_fn1 = os.path.join("output", "sample_%d_%d_anime.jpg" % (epoch, i))
+        out_fn2 = os.path.join("output", "sample_%d_%d_celeb.jpg" % (epoch, i))
+        to_img(anime_img[0], out_fn1)
+        to_img(gen_img[0], out_fn2)
+
+    model_name = "e%d.cyclegan.pt" % (epoch)
     torch.save(
         {
-            "gen": mG.state_dict(),
-            "disc": mD.state_dict()
+            "G12": mG12.state_dict(),
+            "G21": mG21.state_dict(),
+            "D1" : mD1.state_dict(),
+            "D2" : mD2.state_dict()
         },
         os.path.join("models", model_name)
     )
 
+def train(anime_batch, celeb_batch):
+    d1l, d2l, g12l, g21l = 0, 0, 0, 0
+    anime_batch = cu(Variable(anime_batch))
+    celeb_batch = cu(Variable(celeb_batch))
+    # train D
+    loss = 0
+
+    out = mD1(anime_batch)
+    tmp = torch.mean((out - 1) ** 2)
+    loss += tmp
+    d1l += tmp.data[0]
+
+    out = mD2(celeb_batch)
+    tmp = torch.mean((out - 1) ** 2)
+    loss += tmp
+    d2l += tmp.data[0]
+
+    loss = cu(loss)
+    optD.zero_grad()
+    loss.backward()
+    optD.step()
+
+    loss = 0
+
+    fake_anime = mG21(celeb_batch)
+    out = mD1(fake_anime)
+    tmp = torch.mean(out ** 2)
+    loss += tmp
+    d1l += tmp.data[0]
+
+    fake_celeb = mG12(anime_batch)
+    out = mD2(fake_celeb)
+    tmp = torch.mean(out ** 2)
+    loss += tmp
+    d2l += tmp.data[0]
+
+    loss = cu(loss)
+    optD.zero_grad()
+    loss.backward()
+    optD.step()
+
+    # train G
+
+    loss = 0
+    fake_celeb = mG12(anime_batch)
+    out = mD2(fake_celeb)
+    recon_anime = mG21(fake_celeb)
+
+    tmp = torch.mean((out - 1) ** 2) + torch.mean((anime_batch - recon_anime) ** 2)
+    loss += tmp
+    g12l += tmp.data[0]
+
+    loss = cu(loss)
+    optG.zero_grad()
+    loss.backward()
+    optG.step()
+
+    loss = 0
+    fake_anime = mG21(celeb_batch)
+    out = mD1(fake_anime)
+    recon_celeb = mG21(fake_anime)
+
+    tmp = torch.mean((out - 1) ** 2) + torch.mean((celeb_batch - recon_celeb) ** 2)
+    loss += tmp
+    g21l += tmp.data[0]
+
+    loss = cu(loss)
+    optG.zero_grad()
+    loss.backward()
+    optG.step()
+
+    return d1l, d2l, g12l, g21l
+
+
 start = time.time()
 
 for epoch in range(1, args.n_epoch+1):
-    mD.train()
-    mG.train()
-    d_loss, g_loss = 0, 0
-    for (i, (batch, fake_batch)) in enumerate(zip(loader, fake_loader)):
-        # print(gen(batch[2], batch[3]))
-        # break
-        if round(iter) == 'D':
-            d_loss += train_D(batch, fake_batch)
-        else:
-            g_loss += train_G(batch)
-        iter += 1
-    print("Epoch %d %s d %g g %g" % (epoch, time_since(start), d_loss, g_loss))
+    mG12.train()
+    mG21.train()
+    mD1.train()
+    mD2.train()
+    d1_loss, d2_loss, g12_loss, g21_loss = 0, 0, 0, 0
+    for (i, (anime_batch, celeb_batch)) in enumerate(zip(anime_loader, celeb_loader)):
+        d1l, d2l, g12l, g21l = train(anime_batch.float(), celeb_batch.float())
+        d1_loss += d1l
+        d2_loss += d2l
+        g12_loss += g12l
+        g21_loss += g21l
+    print("Epoch %d %s d1 %g d2 %g g12 %g g21 %g" % (epoch, time_since(start),
+                                                     d1_loss, d2_loss,
+                                                     g12_loss, g21_loss))
     if epoch % args.test_every == 0:
         test_and_save(epoch)
 
