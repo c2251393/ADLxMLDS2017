@@ -32,7 +32,7 @@ def main():
         id, desc = line.split(',')
         eyes, hair = get_tag(desc[:-1])
         for i in range(1, 5+1):
-            out_fn = os.path.join("output", "sample_%s_%d.jpg" % (id, i))
+            out_fn = os.path.join("samples", "sample_%s_%d.jpg" % (id, i))
             y = gen(eyes, hair)
             print(out_fn)
             to_img(y[0].data, out_fn)
